@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="HelloCherryBox/HelloCherryBox.Plugin.csproj" />
+  <Project Path="Backup/Backup.Plugin.csproj" />
+</Solution>

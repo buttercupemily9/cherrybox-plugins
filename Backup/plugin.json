@@ -1,0 +1,7 @@
+{
+  "id": "backup",
+  "name": "Backup",
+  "version": "1.0.0",
+  "entryAssembly": "Backup.Plugin.dll",
+  "entryType": "Backup.Plugin.BackupPlugin"
+}

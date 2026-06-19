@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: buttercupemily9/cherrybox
+          path: cherrybox
+
+      - uses: actions/checkout@v4
+        with:
+          path: cherrybox/plugins
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build plugins
+        run: dotnet build CherryBox.Plugins.slnx -c Release
+        working-directory: cherrybox/plugins
