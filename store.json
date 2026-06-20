@@ -1,0 +1,15 @@
+{
+  "catalogVersion": 2,
+  "plugins": [
+    {
+      "id": "hello-cherrybox",
+      "folder": "HelloCherryBox",
+      "description": "Sample plugin demonstrating the CherryBox plugin API."
+    },
+    {
+      "id": "backup",
+      "folder": "Backup",
+      "description": "Backup and restore settings, databases, and configuration."
+    }
+  ]
+}

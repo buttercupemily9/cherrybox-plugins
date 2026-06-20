@@ -1,21 +1,32 @@
-name: CI
+name: Build and release plugins
 
 on:
   push:
     branches: [dev]
   pull_request:
     branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plugin-release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout CherryBox (plugin abstractions)
+        uses: actions/checkout@v4
         with:
           repository: buttercupemily9/cherrybox
+          ref: dev
           path: cherrybox
 
-      - uses: actions/checkout@v4
+      - name: Checkout cherrybox-plugins
+        uses: actions/checkout@v4
         with:
           path: cherrybox/plugins
 
@@ -25,5 +36,47 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Build plugins
-        run: dotnet build CherryBox.Plugins.slnx -c Release
+        run: dotnet build CherryBox.Plugins.slnx -c Release --no-restore false
         working-directory: cherrybox/plugins
+
+      - name: Package plugins
+        shell: pwsh
+        run: ./build-packages.ps1
+        working-directory: cherrybox/plugins
+
+      - name: Verify packages
+        shell: pwsh
+        run: |
+          $packages = Get-ChildItem cherrybox/plugins/packages/*.zip
+          if ($packages.Count -eq 0) { throw "No plugin packages were produced." }
+          $packages | ForEach-Object { Write-Host "Package:" $_.Name "(" $_.Length "bytes)" }
+
+      - name: Upload build artifacts
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-packages
+          path: cherrybox/plugins/packages/*.zip
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Publish latest release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/dev'
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: latest
+          name: Latest plugin packages
+          commit: ${{ github.sha }}
+          allowUpdates: true
+          replacesArtifacts: true
+          makeLatest: true
+          artifactContentType: application/zip
+          artifacts: cherrybox/plugins/packages/*.zip
+          artifactErrorsFailBuild: true
+          body: |
+            Rolling plugin release for CherryBox **Settings → Store**.
+
+            - Built from [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+            - Branch: `dev`
+            - Download pattern: `https://github.com/buttercupemily9/cherrybox-plugins/releases/latest/download/{plugin-id}.zip`
