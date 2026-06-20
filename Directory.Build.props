@@ -1,9 +1,18 @@
 <Project>
+  <!-- Monorepo: inherit Version (0.1.0) and other settings from the main CherryBox repo -->
+  <Import Project="$(MSBuildThisFileDirectory)..\Directory.Build.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)..\Directory.Build.props')" />
+  <!-- Plugins CI: inherit from the checked-out cherrybox tree -->
+  <Import Project="$(MSBuildThisFileDirectory)_cherrybox\Directory.Build.props"
+          Condition="'$(Version)' == '' and Exists('$(MSBuildThisFileDirectory)_cherrybox\Directory.Build.props')" />
+
   <PropertyGroup>
     <!-- Submodule layout: plugins/ lives inside the cherrybox repo -->
     <CherryBoxRoot Condition="'$(CherryBoxRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\src\CherryBox.Core\CherryBox.Core.csproj')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</CherryBoxRoot>
     <!-- Standalone plugins CI: main repo checked out to _cherrybox -->
     <CherryBoxRoot Condition="'$(CherryBoxRoot)' == '' and Exists('$(MSBuildThisFileDirectory)_cherrybox\src\CherryBox.Core\CherryBox.Core.csproj')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)_cherrybox'))</CherryBoxRoot>
     <CherryBoxSrc Condition="'$(CherryBoxRoot)' != ''">$(CherryBoxRoot)\src</CherryBoxSrc>
+    <!-- Standalone cherrybox-plugins repo: MSBuild stops at this .git root, so default SDK version is 1.0.0 -->
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
   </PropertyGroup>
 </Project>
