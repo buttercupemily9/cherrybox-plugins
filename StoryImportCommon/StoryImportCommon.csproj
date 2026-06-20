@@ -7,7 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CherryBox.Plugins.Abstractions\CherryBox.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\CherryBox.Plugins.Abstractions\CherryBox.Plugins.Abstractions.csproj">
+      <Private>false</Private>
+    </ProjectReference>
     <PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
   </ItemGroup>
 
