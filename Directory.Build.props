@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Submodule layout: plugins/ lives inside the cherrybox repo -->
+    <CherryBoxRoot Condition="'$(CherryBoxRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\src\CherryBox.Core\CherryBox.Core.csproj')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</CherryBoxRoot>
+    <!-- Standalone plugins CI: main repo checked out to _cherrybox -->
+    <CherryBoxRoot Condition="'$(CherryBoxRoot)' == '' and Exists('$(MSBuildThisFileDirectory)_cherrybox\src\CherryBox.Core\CherryBox.Core.csproj')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)_cherrybox'))</CherryBoxRoot>
+    <CherryBoxSrc Condition="'$(CherryBoxRoot)' != ''">$(CherryBoxRoot)\src</CherryBoxSrc>
+  </PropertyGroup>
+</Project>

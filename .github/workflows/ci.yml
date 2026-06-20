@@ -21,6 +21,13 @@ jobs:
       - name: Checkout cherrybox-plugins
         uses: actions/checkout@v4
 
+      - name: Checkout cherrybox (plugin build dependencies)
+        uses: actions/checkout@v4
+        with:
+          repository: buttercupemily9/cherrybox
+          ref: dev
+          path: _cherrybox
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
