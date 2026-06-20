@@ -1,20 +1,41 @@
 {
-  "catalogVersion": 2,
+  "catalogVersion": 3,
   "plugins": [
     {
       "id": "hello-cherrybox",
       "folder": "HelloCherryBox",
-      "description": "Sample plugin demonstrating the CherryBox plugin API."
+      "name": "Hello CherryBox",
+      "version": "1.0.0",
+      "description": "Sample plugin demonstrating the CherryBox plugin API.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/HelloCherryBox",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/HelloCherryBox/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial sample plugin release."
     },
     {
       "id": "backup",
       "folder": "Backup",
-      "description": "Backup and restore settings, databases, and configuration."
+      "name": "Backup",
+      "version": "1.0.0",
+      "description": "Backup and restore settings, databases, and configuration.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Backup",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Backup/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Backup plugin marker; core backup logic ships in CherryBox."
     },
     {
       "id": "story-sites",
       "folder": "StorySites",
-      "description": "Import stories from Reddit, Literotica, LushStories, SexStories, SexStories69, and StoriesOnline."
+      "name": "Story site importers",
+      "version": "1.0.0",
+      "description": "Import stories from Reddit, Literotica, LushStories, SexStories, SexStories69, and StoriesOnline.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StorySites",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Story import plugin for supported external sites."
     }
   ]
 }
