@@ -1,4 +1,5 @@
 using CherryBox.Auth;
+using CherryBox.Core.Entities;
 using CherryBox.Data;
 using CherryBox.Plugins.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ internal sealed class PasswordResetService : IPasswordResetService
     private readonly IAuthService _auth;
     private readonly PasswordResetSettingsStore _settingsStore;
     private readonly ResetTokenStore _tokenStore;
+    private readonly UserEmailStore _emailStore;
     private readonly SmtpEmailSender _emailSender;
     private readonly ILogger<PasswordResetService> _logger;
 
@@ -20,6 +22,7 @@ internal sealed class PasswordResetService : IPasswordResetService
         IAuthService auth,
         PasswordResetSettingsStore settingsStore,
         ResetTokenStore tokenStore,
+        UserEmailStore emailStore,
         SmtpEmailSender emailSender,
         ILogger<PasswordResetService> logger)
     {
@@ -27,6 +30,7 @@ internal sealed class PasswordResetService : IPasswordResetService
         _auth = auth;
         _settingsStore = settingsStore;
         _tokenStore = tokenStore;
+        _emailStore = emailStore;
         _emailSender = emailSender;
         _logger = logger;
     }
@@ -103,14 +107,15 @@ internal sealed class PasswordResetService : IPasswordResetService
         var normalized = usernameOrEmail.Trim();
         var lowered = normalized.ToLowerInvariant();
         var user = await _db.Users.AsNoTracking()
-            .FirstOrDefaultAsync(
-                u => u.IsActive && (u.Username.ToLower() == lowered || (u.Email != null && u.Email.ToLower() == lowered)),
-                cancellationToken);
+            .FirstOrDefaultAsync(u => u.IsActive && u.Username.ToLower() == lowered, cancellationToken);
+
+        if (user is null && normalized.Contains('@', StringComparison.Ordinal))
+            user = await FindUserByEmailAsync(normalized, cancellationToken);
 
         if (user is null)
             return;
 
-        var email = ResolveEmail(user);
+        var email = await ResolveEmailAsync(user.Id, user.Username, cancellationToken);
         if (string.IsNullOrWhiteSpace(email))
             return;
 
@@ -156,6 +161,34 @@ internal sealed class PasswordResetService : IPasswordResetService
         return await _auth.SetPasswordAsync(userId.Value, newPassword, cancellationToken);
     }
 
+    public Task<string?> GetUserEmailAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        _emailStore.GetAsync(userId, cancellationToken);
+
+    public Task SetUserEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default) =>
+        _emailStore.SetAsync(userId, email, cancellationToken);
+
+    public Task<Guid?> FindUserIdByEmailAsync(string email, CancellationToken cancellationToken = default) =>
+        _emailStore.FindUserIdByEmailAsync(email, cancellationToken);
+
+    private async Task<User?> FindUserByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        var userId = await _emailStore.FindUserIdByEmailAsync(email, cancellationToken);
+        if (userId is null)
+            return null;
+
+        return await _db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId.Value && u.IsActive, cancellationToken);
+    }
+
+    private async Task<string?> ResolveEmailAsync(Guid userId, string username, CancellationToken cancellationToken)
+    {
+        var email = await _emailStore.GetAsync(userId, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(email))
+            return email.Trim();
+
+        return username.Contains('@', StringComparison.Ordinal) ? username.Trim() : null;
+    }
+
     private static PasswordResetSettingsDto ToDto(PasswordResetSettings settings) => new(
         settings.Enabled,
         settings.SmtpHost,
@@ -167,14 +200,6 @@ internal sealed class PasswordResetService : IPasswordResetService
         settings.FromDisplayName,
         settings.PublicBaseUrl,
         settings.TokenLifetimeMinutes);
-
-    private static string? ResolveEmail(CherryBox.Core.Entities.User user)
-    {
-        if (!string.IsNullOrWhiteSpace(user.Email))
-            return user.Email.Trim();
-
-        return user.Username.Contains('@', StringComparison.Ordinal) ? user.Username.Trim() : null;
-    }
 
     private static void ValidateSendSettings(PasswordResetSettings settings)
     {
