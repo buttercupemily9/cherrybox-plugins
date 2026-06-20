@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Downloads</title>
+  <link rel="stylesheet" href="plugin-ui.css" />
+</head>
+<body>
+  <h1>Downloads</h1>
+  <p class="meta">Queue new URLs from <strong>Settings → Queue</strong> (Download plugin tab).</p>
+  <div id="message" class="plugin-message" hidden></div>
+  <div id="list"></div>
+  <script src="plugin-api.js"></script>
+  <script>
+    const { api, STATUS_LABEL, escapeHtml, showMessage } = window.DownloadPluginUi;
+    const messageEl = document.getElementById('message');
+    const listEl = document.getElementById('list');
+    let retryBusy = null;
+
+    function canRetry(status) {
+      return status === 'Failed' || status === 'Cancelled' || status === 'Blocked';
+    }
+
+    function render(downloads) {
+      if (!downloads.length) {
+        listEl.innerHTML = '<p class="meta">No downloads yet.</p>';
+        return;
+      }
+
+      listEl.innerHTML = `<ul class="download-list">${downloads.map((d) => `
+        <li class="download-row">
+          <div class="download-row__info">
+            <div class="download-row__header">
+              <span class="status">${escapeHtml(STATUS_LABEL[d.status] ?? d.status)}</span>
+              <a class="download-row__url" href="${escapeHtml(d.url)}" target="_blank" rel="noreferrer">${escapeHtml(d.url)}</a>
+            </div>
+            ${d.outputPath ? `<p class="meta">Saved to ${escapeHtml(d.outputPath)}</p>` : ''}
+            ${(d.blockReason || d.errorMessage) ? `<p class="error">${escapeHtml(d.blockReason ?? d.errorMessage)}</p>` : ''}
+            ${d.existingMediaTitle ? `<p class="meta">Already in library: ${escapeHtml(d.existingMediaTitle)}</p>` : ''}
+          </div>
+          ${canRetry(d.status) ? `<button type="button" data-retry="${d.id}" ${retryBusy ? 'disabled' : ''}>${retryBusy === d.id ? 'Retrying…' : 'Retry'}</button>` : ''}
+        </li>`).join('')}</ul>`;
+
+      listEl.querySelectorAll('[data-retry]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const id = button.getAttribute('data-retry');
+          retryBusy = id;
+          render(downloads);
+          try {
+            await api.retryDownload(id);
+            showMessage(messageEl, 'Download re-queued');
+            await refresh();
+          } catch (err) {
+            showMessage(messageEl, err.message, true);
+          } finally {
+            retryBusy = null;
+          }
+        });
+      });
+    }
+
+    async function refresh() {
+      const downloads = await api.listDownloads();
+      render(downloads);
+    }
+
+    refresh().catch((err) => showMessage(messageEl, err.message, true));
+    setInterval(() => refresh().catch(() => undefined), 4000);
+  </script>
+</body>
+</html>

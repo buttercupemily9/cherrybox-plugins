@@ -1,0 +1,518 @@
+using System.Diagnostics;
+using System.Text.Json;
+using CherryBox.Core.Configuration;
+using CherryBox.Core.Entities;
+using CherryBox.Core.Enums;
+using CherryBox.Core.Platform;
+using CherryBox.Data;
+using CherryBox.Encoding;
+using CherryBox.Media;
+using CherryBox.Metadata.StashBox;
+using CherryBox.Plugins.Abstractions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace CherryBox.Download.Plugin;
+
+public sealed class DownloadService : IDownloadService
+{
+    private readonly CherryBoxDbContext _db;
+    private readonly IDownloadHistoryStore _history;
+    private readonly IConfigManager _config;
+    private readonly IDownloadJobTracker _jobTracker;
+
+    public DownloadService(
+        CherryBoxDbContext db,
+        IDownloadHistoryStore history,
+        IConfigManager config,
+        IDownloadJobTracker jobTracker)
+    {
+        _db = db;
+        _history = history;
+        _config = config;
+        _jobTracker = jobTracker;
+    }
+
+    public async Task<EnqueueDownloadResult> EnqueueAsync(
+        DownloadRequest request,
+        Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            throw new InvalidOperationException("URL is required.");
+
+        var url = request.Url.Trim();
+        var normalized = DownloadUrlNormalizer.Normalize(url);
+
+        var historyHit = await _history.FindByUrlAsync(normalized, cancellationToken);
+        if (historyHit is not null)
+        {
+            var media = await ResolveMediaAsync(historyHit.MediaItemId, historyHit.FilePath, cancellationToken);
+            return await CreateBlockedResultAsync(
+                url,
+                normalized,
+                request.TargetFolderId,
+                userId,
+                $"This URL was already downloaded on {historyHit.DownloadedAt.ToLocalTime():g}.",
+                media?.Id ?? historyHit.MediaItemId,
+                media?.Title ?? historyHit.Title,
+                cancellationToken);
+        }
+
+        var activeDuplicate = await _db.DownloadJobs.AnyAsync(
+            j => j.NormalizedUrl == normalized &&
+                 (j.Status == DownloadJobStatus.Pending || j.Status == DownloadJobStatus.Running),
+            cancellationToken);
+        if (activeDuplicate)
+        {
+            return await CreateBlockedResultAsync(
+                url,
+                normalized,
+                request.TargetFolderId,
+                userId,
+                "This URL is already in the download queue.",
+                null,
+                null,
+                cancellationToken);
+        }
+
+        var job = new DownloadJob
+        {
+            Url = url,
+            NormalizedUrl = normalized,
+            TargetFolderId = request.TargetFolderId,
+            CreatedByUserId = userId,
+            Status = DownloadJobStatus.Pending
+        };
+        _db.DownloadJobs.Add(job);
+        await _db.SaveChangesAsync(cancellationToken);
+        return new EnqueueDownloadResult(true, await ToDtoAsync(job, cancellationToken), null, null, null);
+    }
+
+    public async Task<IReadOnlyList<DownloadJobDto>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        var jobs = await _db.DownloadJobs.ToListAsync(cancellationToken);
+        var dtos = new List<DownloadJobDto>();
+        foreach (var job in jobs.OrderByDescending(j => j.CreatedAt))
+            dtos.Add(await ToDtoAsync(job, cancellationToken));
+        return dtos;
+    }
+
+    public async Task<IReadOnlyList<DownloadJobDto>> ListActiveAsync(CancellationToken cancellationToken = default)
+    {
+        var jobs = await _db.DownloadJobs
+            .Where(j => j.Status == DownloadJobStatus.Pending || j.Status == DownloadJobStatus.Running)
+            .ToListAsync(cancellationToken);
+        var dtos = new List<DownloadJobDto>();
+        foreach (var job in jobs.OrderBy(j => j.CreatedAt))
+            dtos.Add(await ToDtoAsync(job, cancellationToken));
+        return dtos;
+    }
+
+    public async Task<DownloadJobDto?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var job = await _db.DownloadJobs.FindAsync([id], cancellationToken);
+        return job is null ? null : await ToDtoAsync(job, cancellationToken);
+    }
+
+    public async Task<DownloadJobDto?> RetryAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var job = await _db.DownloadJobs.FindAsync([id], cancellationToken);
+        if (job is null)
+            return null;
+
+        if (job.Status is not (DownloadJobStatus.Failed or DownloadJobStatus.Cancelled or DownloadJobStatus.Blocked))
+            throw new InvalidOperationException("Only failed, cancelled, or blocked downloads can be retried.");
+
+        job.Status = DownloadJobStatus.Pending;
+        job.ErrorMessage = null;
+        job.BlockReason = null;
+        job.OutputPath = null;
+        job.MetadataJson = null;
+        job.ExistingMediaItemId = null;
+        job.RetryAfterAt = null;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        return await ToDtoAsync(job, cancellationToken);
+    }
+
+    public async Task<DownloadJobDto?> CancelAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var job = await _db.DownloadJobs.FindAsync([id], cancellationToken);
+        if (job is null)
+            return null;
+
+        if (job.Status is not (DownloadJobStatus.Pending or DownloadJobStatus.Running))
+            throw new InvalidOperationException("Only pending or running downloads can be cancelled.");
+
+        if (job.Status == DownloadJobStatus.Running)
+            _jobTracker.TryCancel(id);
+
+        job.Status = DownloadJobStatus.Cancelled;
+        job.ErrorMessage = null;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        return await ToDtoAsync(job, cancellationToken);
+    }
+
+    public Task<DownloadSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var download = _config.Current.Download;
+        return Task.FromResult(new DownloadSettingsDto(
+            download.AutoRetryFailedDownloads,
+            download.AutoRetryDelayMinutes,
+            download.HistoryDatabaseFileName));
+    }
+
+    public async Task<DownloadSettingsDto> UpdateSettingsAsync(
+        UpdateDownloadSettingsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.AutoRetryDelayMinutes < 1)
+            throw new InvalidOperationException("Auto-retry delay must be at least 1 minute.");
+
+        _config.Current.Download.AutoRetryFailedDownloads = request.AutoRetryFailedDownloads;
+        _config.Current.Download.AutoRetryDelayMinutes = request.AutoRetryDelayMinutes;
+        await _config.SaveAsync(cancellationToken);
+        return await GetSettingsAsync(cancellationToken);
+    }
+
+    public Task<IReadOnlyList<DownloadHistoryEntry>> ListHistoryAsync(CancellationToken cancellationToken = default) =>
+        _history.ListAsync(cancellationToken: cancellationToken);
+
+    private async Task<EnqueueDownloadResult> CreateBlockedResultAsync(
+        string url,
+        string normalized,
+        Guid? targetFolderId,
+        Guid? userId,
+        string reason,
+        Guid? existingMediaItemId,
+        string? existingMediaTitle,
+        CancellationToken cancellationToken)
+    {
+        var job = new DownloadJob
+        {
+            Url = url,
+            NormalizedUrl = normalized,
+            TargetFolderId = targetFolderId,
+            CreatedByUserId = userId,
+            Status = DownloadJobStatus.Blocked,
+            BlockReason = reason,
+            ExistingMediaItemId = existingMediaItemId,
+            ErrorMessage = reason
+        };
+        _db.DownloadJobs.Add(job);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new EnqueueDownloadResult(
+            false,
+            await ToDtoAsync(job, cancellationToken),
+            reason,
+            existingMediaItemId,
+            existingMediaTitle);
+    }
+
+    private async Task<MediaItem?> ResolveMediaAsync(
+        Guid? mediaItemId,
+        string? filePath,
+        CancellationToken cancellationToken)
+    {
+        if (mediaItemId.HasValue)
+        {
+            var byId = await _db.MediaItems.FindAsync([mediaItemId.Value], cancellationToken);
+            if (byId is not null)
+                return byId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(filePath))
+        {
+            return await _db.MediaItems.FirstOrDefaultAsync(
+                m => m.FilePath == filePath,
+                cancellationToken);
+        }
+
+        return null;
+    }
+
+    private async Task<DownloadJobDto> ToDtoAsync(DownloadJob job, CancellationToken cancellationToken)
+    {
+        string? existingTitle = null;
+        var mediaId = job.ExistingMediaItemId;
+        if (mediaId.HasValue)
+        {
+            var media = await _db.MediaItems.FindAsync([mediaId.Value], cancellationToken);
+            existingTitle = media?.Title ?? media?.FileName;
+        }
+
+        return new DownloadJobDto(
+            job.Id,
+            job.Url,
+            job.Status,
+            job.OutputPath,
+            job.ErrorMessage,
+            job.BlockReason,
+            mediaId,
+            existingTitle,
+            job.CreatedAt,
+            job.UpdatedAt,
+            job.RetryAfterAt,
+            job.RetryCount);
+    }
+}
+
+public sealed class DownloadWorker
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IPlatformPaths _paths;
+    private readonly IConfigManager _configManager;
+    private readonly IDownloadJobTracker _jobTracker;
+    private readonly ILogger<DownloadWorker> _logger;
+
+    public DownloadWorker(
+        IServiceScopeFactory scopeFactory,
+        IPlatformPaths paths,
+        IConfigManager configManager,
+        IDownloadJobTracker jobTracker,
+        ILogger<DownloadWorker> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _paths = paths;
+        _configManager = configManager;
+        _jobTracker = jobTracker;
+        _logger = logger;
+    }
+
+    public async Task RunAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
+                await RequeueDueRetriesAsync(db, stoppingToken);
+
+                var pending = await db.DownloadJobs
+                    .Where(j => j.Status == DownloadJobStatus.Pending)
+                    .ToListAsync(stoppingToken);
+                var job = pending.MinBy(j => j.CreatedAt);
+
+                if (job is null)
+                {
+                    await Task.Delay(3000, stoppingToken);
+                    continue;
+                }
+
+                await ProcessJobAsync(scope, db, job, stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning("Download worker paused — database unavailable. Retrying in 30s.");
+                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            }
+        }
+    }
+
+    private async Task RequeueDueRetriesAsync(CherryBoxDbContext db, CancellationToken stoppingToken)
+    {
+        if (!_configManager.Current.Download.AutoRetryFailedDownloads)
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+        var due = await db.DownloadJobs
+            .Where(j => j.Status == DownloadJobStatus.Failed &&
+                        j.RetryAfterAt != null &&
+                        j.RetryAfterAt <= now)
+            .ToListAsync(stoppingToken);
+
+        foreach (var job in due)
+        {
+            job.Status = DownloadJobStatus.Pending;
+            job.RetryAfterAt = null;
+            job.ErrorMessage = null;
+            job.RetryCount++;
+            job.UpdatedAt = now;
+            _logger.LogInformation("Auto-retry queued download {JobId} (attempt {Attempt})", job.Id, job.RetryCount);
+        }
+
+        if (due.Count > 0)
+            await db.SaveChangesAsync(stoppingToken);
+    }
+
+    private async Task ProcessJobAsync(
+        IServiceScope scope,
+        CherryBoxDbContext db,
+        DownloadJob job,
+        CancellationToken stoppingToken)
+    {
+        job.Status = DownloadJobStatus.Running;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(stoppingToken);
+
+        try
+        {
+            var outputPath = await RunYtDlpAsync(job, stoppingToken);
+            await db.Entry(job).ReloadAsync(stoppingToken);
+            if (job.Status == DownloadJobStatus.Cancelled)
+                return;
+
+            job.OutputPath = outputPath;
+            job.Status = DownloadJobStatus.Completed;
+            job.MetadataJson = await TryLoadInfoJsonAsync(outputPath, stoppingToken);
+            job.ErrorMessage = null;
+            job.BlockReason = null;
+            job.RetryAfterAt = null;
+            await db.SaveChangesAsync(stoppingToken);
+
+            var scanner = scope.ServiceProvider.GetRequiredService<ILibraryScanner>();
+            if (job.TargetFolderId.HasValue)
+                await scanner.ScanFolderAsync(job.TargetFolderId.Value, stoppingToken);
+
+            var metadata = scope.ServiceProvider.GetRequiredService<StashBoxMetadataService>();
+            var encoder = scope.ServiceProvider.GetRequiredService<IMediaEncoder>();
+            var fingerprints = scope.ServiceProvider.GetRequiredService<IVideoFingerprintService>();
+            var history = scope.ServiceProvider.GetRequiredService<IDownloadHistoryStore>();
+
+            var probe = await encoder.ProbeAsync(outputPath, stoppingToken);
+            var computed = await fingerprints.ComputeAsync(outputPath, probe?.DurationSeconds, stoppingToken);
+            var scene = await metadata.LookupByFingerprintsAsync(
+                computed.Md5Hash,
+                computed.Phash,
+                probe?.DurationSeconds,
+                stoppingToken);
+            if (scene is null)
+                scene = await metadata.LookupByUrlAsync(job.Url, stoppingToken);
+            if (scene is not null)
+                job.MetadataJson = JsonSerializer.Serialize(scene);
+            await db.SaveChangesAsync(stoppingToken);
+
+            var mediaItem = await db.MediaItems.FirstOrDefaultAsync(
+                m => m.FilePath == outputPath,
+                stoppingToken);
+            var title = TryExtractTitle(job.MetadataJson) ?? Path.GetFileNameWithoutExtension(outputPath);
+            await history.RecordAsync(
+                job.NormalizedUrl,
+                job.Url,
+                title,
+                outputPath,
+                mediaItem?.Id,
+                stoppingToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await db.Entry(job).ReloadAsync(stoppingToken);
+            if (job.Status == DownloadJobStatus.Cancelled)
+                return;
+
+            job.Status = DownloadJobStatus.Failed;
+            job.ErrorMessage = ex.Message;
+            job.UpdatedAt = DateTimeOffset.UtcNow;
+            if (_configManager.Current.Download.AutoRetryFailedDownloads)
+            {
+                job.RetryAfterAt = DateTimeOffset.UtcNow.AddMinutes(
+                    Math.Max(1, _configManager.Current.Download.AutoRetryDelayMinutes));
+            }
+
+            await db.SaveChangesAsync(stoppingToken);
+            _logger.LogError(ex, "Download failed for {Url}", job.Url);
+        }
+    }
+
+    private async Task<string> RunYtDlpAsync(DownloadJob job, CancellationToken cancellationToken)
+    {
+        var ytDlp = ResolveYtDlp();
+        var folder = await GetOutputFolderAsync(job.TargetFolderId, cancellationToken);
+        Directory.CreateDirectory(folder);
+
+        var outputTemplate = Path.Combine(folder, "%(title)s [%(id)s].%(ext)s");
+        var args = $"-o \"{outputTemplate}\" --write-info-json \"{job.Url}\"";
+
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = ytDlp,
+                Arguments = args,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+        process.Start();
+        _jobTracker.Register(job.Id, process);
+        try
+        {
+            var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr)
+                    ? "yt-dlp exited with non-zero code"
+                    : stderr.Trim());
+        }
+        finally
+        {
+            _jobTracker.Unregister(job.Id);
+        }
+
+        var downloaded = Directory.GetFiles(folder)
+            .Where(f => !f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => new FileInfo(f).LastWriteTimeUtc)
+            .FirstOrDefault();
+
+        if (downloaded is null)
+            throw new InvalidOperationException("No file downloaded");
+
+        return downloaded;
+    }
+
+    private async Task<string> GetOutputFolderAsync(Guid? folderId, CancellationToken cancellationToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
+        if (folderId.HasValue)
+        {
+            var folder = await db.LibraryFolders.FindAsync([folderId.Value], cancellationToken);
+            if (folder is not null) return folder.Path;
+        }
+
+        var defaultPath = Path.Combine(_paths.ProgramDataDirectory, "downloads");
+        Directory.CreateDirectory(defaultPath);
+        return defaultPath;
+    }
+
+    private string ResolveYtDlp()
+    {
+        var configured = _configManager.Current.YtDlpPath;
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured)) return configured;
+        var bundled = _paths.GetToolPath("yt-dlp");
+        if (File.Exists(bundled)) return bundled;
+        return "yt-dlp";
+    }
+
+    private static async Task<string?> TryLoadInfoJsonAsync(string outputPath, CancellationToken cancellationToken)
+    {
+        var jsonPath = Path.ChangeExtension(outputPath, ".info.json");
+        if (!File.Exists(jsonPath)) return null;
+        return await File.ReadAllTextAsync(jsonPath, cancellationToken);
+    }
+
+    private static string? TryExtractTitle(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(metadataJson);
+            if (doc.RootElement.TryGetProperty("title", out var title))
+                return title.GetString();
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
+}

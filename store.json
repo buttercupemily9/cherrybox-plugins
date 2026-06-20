@@ -36,6 +36,18 @@
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
       "screenshotUrls": [],
       "changelog": "Story import plugin for supported external sites."
+    },
+    {
+      "id": "download",
+      "folder": "Download",
+      "name": "Video downloader",
+      "version": "1.0.0",
+      "description": "Queue and download videos with yt-dlp, with library scan and StashBox metadata lookup.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Download",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Video downloader moved from core into a plugin."
     }
   ]
 }

@@ -1,0 +1,125 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  --pink: #d63384;
+  --text: #4a2030;
+  --muted: #7a4a5c;
+  --border: #f3c9d9;
+  --bg: #fff5f8;
+  --error: #b42318;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 1.25rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+h1, h2, h3 { color: var(--pink); margin-top: 0; }
+
+.meta { color: var(--muted); font-size: 0.92rem; }
+
+.error { color: var(--error); }
+
+.plugin-message { margin-top: 1rem; }
+
+.download-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.download-row {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.download-row__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.download-row__url {
+  word-break: break-all;
+  color: var(--pink);
+}
+
+.status {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.form-row {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+input, select, button {
+  font: inherit;
+}
+
+input, select {
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+button {
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--pink);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.settings-list__row {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.settings-section {
+  margin-bottom: 1.5rem;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}

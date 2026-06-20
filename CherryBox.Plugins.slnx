@@ -4,4 +4,5 @@
   <Project Path="Backup/Backup.Plugin.csproj" />
   <Project Path="StoryImportCommon/StoryImportCommon.csproj" />
   <Project Path="StorySites/StorySites.Plugin.csproj" />
+  <Project Path="Download/Download.Plugin.csproj" />
 </Solution>
