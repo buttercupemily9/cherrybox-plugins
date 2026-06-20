@@ -3,5 +3,23 @@
   "name": "Hello CherryBox",
   "version": "1.0.0",
   "entryAssembly": "HelloCherryBox.Plugin.dll",
-  "entryType": "HelloCherryBox.Plugin.HelloPlugin"
+  "entryType": "HelloCherryBox.Plugin.HelloPlugin",
+  "mainTabs": [
+    {
+      "id": "home",
+      "label": "Hello",
+      "icon": "plugin",
+      "page": "index.html",
+      "order": 100
+    }
+  ],
+  "settingsTabs": [
+    {
+      "id": "config",
+      "label": "Hello plugin",
+      "icon": "plugin",
+      "page": "settings.html",
+      "order": 100
+    }
+  ]
 }

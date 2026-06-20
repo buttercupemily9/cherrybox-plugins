@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Download.Plugin</AssemblyName>
+    <RootNamespace>CherryBox.Download.Plugin</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CherryBox.Plugins.Abstractions\CherryBox.Plugins.Abstractions.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\CherryBox.Core\CherryBox.Core.csproj" />
+    <ProjectReference Include="..\..\src\CherryBox.Data\CherryBox.Data.csproj" />
+    <ProjectReference Include="..\..\src\CherryBox.Media\CherryBox.Media.csproj" />
+    <ProjectReference Include="..\..\src\CherryBox.Encoding\CherryBox.Encoding.csproj" />
+    <ProjectReference Include="..\..\src\CherryBox.Metadata.StashBox\CherryBox.Metadata.StashBox.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="web\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>web\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+    <Content Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

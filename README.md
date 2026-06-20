@@ -8,10 +8,12 @@ This repository is designed to live at `plugins/` inside the main CherryBox tree
 
 ```
 cherrybox/
-  src/CherryBox.Plugins.Abstractions/
-  plugins/                    ← this repo
+  src/CherryBox.Plugins.Abstractions/   ← source of truth in main repo
+  plugins/                              ← this repo
+    CherryBox.Plugins.Abstractions/     ← vendored copy for standalone CI/build
     HelloCherryBox/
     Backup/
+    StorySites/
 ```
 
 ## Plugins
@@ -60,8 +62,8 @@ CherryBox **Settings → Store** always pulls the latest catalog and packages fr
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `dev`:
 
-1. Checks out [CherryBox](https://github.com/buttercupemily9/cherrybox) (`dev`) for `CherryBox.Plugins.Abstractions`
-2. Builds all plugins in this repo
+1. Checks out this repo (includes vendored `CherryBox.Plugins.Abstractions`)
+2. Builds all plugins
 3. Packages each plugin as `{plugin-id}.zip`
 4. Updates the rolling [**latest** release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) used by the app store
 
@@ -79,10 +81,16 @@ Regenerate `store.json` after adding a plugin folder:
 .\sync-store.ps1
 ```
 
+When abstractions change in the main CherryBox repo, sync the vendored copy here:
+
+```powershell
+.\sync-abstractions.ps1
+```
+
 ## Create a plugin
 
 1. Add a new folder with `plugin.json`, `.csproj`, and a class implementing `ICherryBoxPlugin`.
-2. Reference `../../src/CherryBox.Plugins.Abstractions/CherryBox.Plugins.Abstractions.csproj`.
+2. Reference `../CherryBox.Plugins.Abstractions/CherryBox.Plugins.Abstractions.csproj`.
 3. See [HelloCherryBox/HelloPlugin.cs](HelloCherryBox/HelloPlugin.cs) for a minimal example.
 
 ## License

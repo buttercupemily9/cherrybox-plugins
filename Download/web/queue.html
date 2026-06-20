@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Download queue</title>
+  <link rel="stylesheet" href="plugin-ui.css" />
+</head>
+<body>
+  <h1>Download queue</h1>
+  <p class="meta">Queue URLs for yt-dlp. Already-downloaded URLs are blocked using the download history database.</p>
+  <div id="message" class="plugin-message" hidden></div>
+
+  <div class="settings-section">
+    <h2>Queue download</h2>
+    <form id="queue-form">
+      <div class="form-row">
+        <label for="url">URL</label>
+        <input id="url" name="url" placeholder="https://…" required />
+      </div>
+      <div class="form-row">
+        <label for="folder">Target folder</label>
+        <select id="folder" name="folder">
+          <option value="">Default downloads folder</option>
+        </select>
+      </div>
+      <button type="submit" id="queue-btn">Queue download</button>
+    </form>
+  </div>
+
+  <div class="settings-section">
+    <h2>Queued &amp; recent downloads</h2>
+    <div id="downloads"></div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Download settings</h2>
+    <form id="settings-form">
+      <div class="form-row">
+        <label><input type="checkbox" id="auto-retry" /> Auto-retry failed downloads</label>
+      </div>
+      <div class="form-row">
+        <label for="retry-minutes">Retry after (minutes)</label>
+        <input id="retry-minutes" type="number" min="1" step="1" value="60" />
+      </div>
+      <p class="meta" id="history-db"></p>
+      <button type="submit" id="settings-btn">Save download settings</button>
+    </form>
+  </div>
+
+  <div class="settings-section">
+    <h2>Download history</h2>
+    <div id="history"></div>
+  </div>
+
+  <script src="plugin-api.js"></script>
+  <script>
+    const { api, STATUS_LABEL, formatTime, escapeHtml, showMessage } = window.DownloadPluginUi;
+    const messageEl = document.getElementById('message');
+    let retryBusy = null;
+    let cancelBusy = null;
+
+    function canRetry(status) {
+      return status === 'Failed' || status === 'Cancelled' || status === 'Blocked';
+    }
+
+    function canCancel(status) {
+      return status === 'Pending' || status === 'Running';
+    }
+
+    function renderDownloads(downloads) {
+      const el = document.getElementById('downloads');
+      if (!downloads.length) {
+        el.innerHTML = '<p class="meta">No downloads queued yet.</p>';
+        return;
+      }
+
+      el.innerHTML = `<ul class="download-list">${downloads.map((d) => `
+        <li class="download-row">
+          <div class="download-row__info">
+            <div class="download-row__header">
+              <span class="status">${escapeHtml(STATUS_LABEL[d.status] ?? d.status)}</span>
+              <a class="download-row__url" href="${escapeHtml(d.url)}" target="_blank" rel="noreferrer">${escapeHtml(d.url)}</a>
+            </div>
+            ${d.outputPath ? `<p class="meta">Saved to ${escapeHtml(d.outputPath)}</p>` : ''}
+            ${(d.blockReason || d.errorMessage) ? `<p class="error">${escapeHtml(d.blockReason ?? d.errorMessage)}</p>` : ''}
+            ${d.retryAfterAt && d.status === 'Failed' ? `<p class="meta">Auto-retry after ${formatTime(d.retryAfterAt)}</p>` : ''}
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            ${canRetry(d.status) ? `<button type="button" class="secondary" data-retry="${d.id}">${retryBusy === d.id ? 'Retrying…' : 'Retry'}</button>` : ''}
+            ${canCancel(d.status) ? `<button type="button" class="secondary" data-cancel="${d.id}">${cancelBusy === d.id ? 'Cancelling…' : 'Cancel'}</button>` : ''}
+          </div>
+        </li>`).join('')}</ul>`;
+
+      el.querySelectorAll('[data-retry]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          retryBusy = button.getAttribute('data-retry');
+          await refreshDownloads();
+          try {
+            await api.retryDownload(retryBusy);
+            showMessage(messageEl, 'Download re-queued');
+            await refreshDownloads();
+          } catch (err) {
+            showMessage(messageEl, err.message, true);
+          } finally {
+            retryBusy = null;
+          }
+        });
+      });
+
+      el.querySelectorAll('[data-cancel]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          cancelBusy = button.getAttribute('data-cancel');
+          await refreshDownloads();
+          try {
+            await api.cancelDownload(cancelBusy);
+            showMessage(messageEl, 'Download cancelled');
+            await refreshDownloads();
+          } catch (err) {
+            showMessage(messageEl, err.message, true);
+          } finally {
+            cancelBusy = null;
+          }
+        });
+      });
+    }
+
+    function renderHistory(history) {
+      const el = document.getElementById('history');
+      if (!history.length) {
+        el.innerHTML = '<p class="meta">No download history yet.</p>';
+        return;
+      }
+
+      el.innerHTML = `<ul class="settings-list">${history.map((entry) => `
+        <li class="settings-list__row">
+          <strong>${escapeHtml(entry.title ?? entry.originalUrl)}</strong>
+          <p class="meta">${formatTime(entry.downloadedAt)}</p>
+        </li>`).join('')}</ul>`;
+    }
+
+    async function refreshDownloads() {
+      const [downloads, history, settings] = await Promise.all([
+        api.listDownloads(),
+        api.listDownloadHistory(),
+        api.getDownloadSettings(),
+      ]);
+      renderDownloads(downloads);
+      renderHistory(history);
+      document.getElementById('auto-retry').checked = settings.autoRetryFailedDownloads;
+      document.getElementById('retry-minutes').value = settings.autoRetryDelayMinutes;
+      document.getElementById('history-db').textContent = `History database: ${settings.historyDatabaseFileName}`;
+    }
+
+    async function loadFolders() {
+      const folders = await api.listFolders();
+      const select = document.getElementById('folder');
+      folders.forEach((folder) => {
+        const option = document.createElement('option');
+        option.value = folder.id;
+        option.textContent = folder.displayName;
+        select.appendChild(option);
+      });
+    }
+
+    document.getElementById('queue-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = document.getElementById('queue-btn');
+      button.disabled = true;
+      try {
+        const url = document.getElementById('url').value.trim();
+        const folderId = document.getElementById('folder').value || undefined;
+        const result = await api.enqueueDownload(url, folderId);
+        if (!result.accepted) {
+          showMessage(messageEl, result.blockReason ?? 'Download blocked', true);
+        } else {
+          showMessage(messageEl, 'Download queued');
+          document.getElementById('url').value = '';
+        }
+        await refreshDownloads();
+      } catch (err) {
+        showMessage(messageEl, err.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById('settings-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = document.getElementById('settings-btn');
+      button.disabled = true;
+      try {
+        await api.updateDownloadSettings({
+          autoRetryFailedDownloads: document.getElementById('auto-retry').checked,
+          autoRetryDelayMinutes: Math.max(1, Number(document.getElementById('retry-minutes').value) || 1),
+        });
+        showMessage(messageEl, 'Download settings saved');
+      } catch (err) {
+        showMessage(messageEl, err.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    Promise.all([loadFolders(), refreshDownloads()])
+      .catch((err) => showMessage(messageEl, err.message, true));
+
+    setInterval(() => refreshDownloads().catch(() => undefined), 4000);
+  </script>
+</body>
+</html>

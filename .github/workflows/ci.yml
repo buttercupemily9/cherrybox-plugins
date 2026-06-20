@@ -18,17 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout CherryBox (plugin abstractions)
-        uses: actions/checkout@v4
-        with:
-          repository: buttercupemily9/cherrybox
-          ref: dev
-          path: cherrybox
-
       - name: Checkout cherrybox-plugins
         uses: actions/checkout@v4
-        with:
-          path: cherrybox/plugins
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -36,18 +27,16 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Build plugins
-        run: dotnet build CherryBox.Plugins.slnx -c Release --no-restore false
-        working-directory: cherrybox/plugins
+        run: dotnet build CherryBox.Plugins.slnx -c Release
 
       - name: Package plugins
         shell: pwsh
         run: ./build-packages.ps1
-        working-directory: cherrybox/plugins
 
       - name: Verify packages
         shell: pwsh
         run: |
-          $packages = Get-ChildItem cherrybox/plugins/packages/*.zip
+          $packages = Get-ChildItem packages/*.zip
           if ($packages.Count -eq 0) { throw "No plugin packages were produced." }
           $packages | ForEach-Object { Write-Host "Package:" $_.Name "(" $_.Length "bytes)" }
 
@@ -56,7 +45,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: plugin-packages
-          path: cherrybox/plugins/packages/*.zip
+          path: packages/*.zip
           retention-days: 14
           if-no-files-found: error
 
@@ -72,7 +61,7 @@ jobs:
           replacesArtifacts: true
           makeLatest: true
           artifactContentType: application/zip
-          artifacts: cherrybox/plugins/packages/*.zip
+          artifacts: packages/*.zip
           artifactErrorsFailBuild: true
           body: |
             Rolling plugin release for CherryBox **Settings → Store**.
