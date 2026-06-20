@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="HelloCherryBox/HelloCherryBox.Plugin.csproj" />
   <Project Path="Backup/Backup.Plugin.csproj" />
+  <Project Path="StoryImportCommon/StoryImportCommon.csproj" />
+  <Project Path="StorySites/StorySites.Plugin.csproj" />
 </Solution>

@@ -45,7 +45,39 @@ Copy a published plugin folder to:
   *.Plugin.dll
 ```
 
-Reload from **Settings → Plugins** or `POST /api/v1/plugins/reload`.
+Reload from **Settings → Plugins** or **Settings → Store**, or `POST /api/v1/plugins/reload`.
+
+## Plugin store
+
+CherryBox **Settings → Store** always pulls the latest catalog and packages from this repo:
+
+| Source | URL |
+|--------|-----|
+| Catalog | [`store.json` on `dev`](https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/dev/store.json) |
+| Packages | [Latest GitHub release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) (`hello-cherrybox.zip`, `backup.zip`, …) |
+
+## CI / releases
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `dev`:
+
+1. Checks out [CherryBox](https://github.com/buttercupemily9/cherrybox) (`dev`) for `CherryBox.Plugins.Abstractions`
+2. Builds all plugins in this repo
+3. Packages each plugin as `{plugin-id}.zip`
+4. Updates the rolling [**latest** release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) used by the app store
+
+Pull requests build and upload packages as workflow artifacts only (no release).
+
+Build packages locally:
+
+```powershell
+.\build-packages.ps1
+```
+
+Regenerate `store.json` after adding a plugin folder:
+
+```powershell
+.\sync-store.ps1
+```
 
 ## Create a plugin
 
