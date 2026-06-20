@@ -10,6 +10,11 @@
       "id": "backup",
       "folder": "Backup",
       "description": "Backup and restore settings, databases, and configuration."
+    },
+    {
+      "id": "story-sites",
+      "folder": "StorySites",
+      "description": "Import stories from Reddit, Literotica, LushStories, SexStories, SexStories69, and StoriesOnline."
     }
   ]
 }
