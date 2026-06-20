@@ -1,0 +1,16 @@
+{
+  "id": "password-reset",
+  "name": "Email password reset",
+  "version": "1.0.0",
+  "entryAssembly": "PasswordReset.Plugin.dll",
+  "entryType": "CherryBox.PasswordReset.Plugin.PasswordResetPlugin",
+  "settingsTabs": [
+    {
+      "id": "smtp",
+      "label": "Password reset",
+      "icon": "key",
+      "page": "settings.html",
+      "order": 95
+    }
+  ]
+}

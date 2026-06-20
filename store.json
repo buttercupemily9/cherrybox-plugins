@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 3,
+  "catalogVersion": 4,
   "plugins": [
     {
       "id": "hello-cherrybox",
@@ -48,6 +48,18 @@
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
       "changelog": "Video downloader moved from core into a plugin."
+    },
+    {
+      "id": "password-reset",
+      "folder": "PasswordReset",
+      "name": "Email password reset",
+      "version": "1.0.0",
+      "description": "Send password reset links over SMTP when users forget their password.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/PasswordReset",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial release with SMTP settings and reset token emails."
     }
   ]
 }

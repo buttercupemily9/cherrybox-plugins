@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Password reset settings</title>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 1rem 1.25rem; color: #4a2040; }
+    h3 { margin-top: 0; }
+    .meta { color: #8b5a7a; font-size: 0.95rem; }
+    .form-row { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.85rem; }
+    label { font-weight: 600; }
+    input[type="text"], input[type="number"], input[type="password"], input[type="email"] {
+      padding: 0.55rem 0.65rem; border: 1px solid #f0b8d0; border-radius: 8px;
+    }
+    button {
+      background: #ff69b4; color: white; border: none; border-radius: 8px;
+      padding: 0.6rem 1rem; cursor: pointer; font-weight: 600;
+    }
+    button.secondary { background: #fff; color: #db5490; border: 1px solid #ffb6c1; margin-left: 0.5rem; }
+    .inline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.85rem; }
+    .success { color: #2f7d32; margin-top: 0.75rem; }
+    .error { color: #c62828; margin-top: 0.75rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+  </style>
+</head>
+<body>
+  <h3>Email password reset</h3>
+  <p class="meta">Configure SMTP so users can reset their password from the login page. Users need an email on their account (Account tab) or a username that looks like an email address.</p>
+
+  <form id="settingsForm">
+    <div class="inline">
+      <input id="enabled" type="checkbox" />
+      <label for="enabled">Enable password reset emails</label>
+    </div>
+
+    <div class="grid">
+      <div class="form-row">
+        <label for="smtpHost">SMTP host</label>
+        <input id="smtpHost" type="text" placeholder="smtp.example.com" required />
+      </div>
+      <div class="form-row">
+        <label for="smtpPort">SMTP port</label>
+        <input id="smtpPort" type="number" min="1" value="587" required />
+      </div>
+    </div>
+
+    <div class="inline">
+      <input id="useTls" type="checkbox" checked />
+      <label for="useTls">Use STARTTLS</label>
+    </div>
+
+    <div class="grid">
+      <div class="form-row">
+        <label for="username">SMTP username</label>
+        <input id="username" type="text" autocomplete="username" />
+      </div>
+      <div class="form-row">
+        <label for="password">SMTP password</label>
+        <input id="password" type="password" autocomplete="current-password" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="form-row">
+        <label for="fromAddress">From address</label>
+        <input id="fromAddress" type="email" placeholder="noreply@example.com" required />
+      </div>
+      <div class="form-row">
+        <label for="fromDisplayName">From name</label>
+        <input id="fromDisplayName" type="text" value="CherryBox" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="form-row">
+        <label for="publicBaseUrl">Public base URL</label>
+        <input id="publicBaseUrl" type="text" placeholder="https://cherrybox.example.com" required />
+      </div>
+      <div class="form-row">
+        <label for="tokenLifetimeMinutes">Reset link lifetime (minutes)</label>
+        <input id="tokenLifetimeMinutes" type="number" min="5" max="1440" value="60" required />
+      </div>
+    </div>
+
+    <button type="submit">Save settings</button>
+  </form>
+
+  <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #ffd1e6;" />
+
+  <h4>Send test email</h4>
+  <div class="form-row">
+    <label for="testEmail">Recipient</label>
+    <input id="testEmail" type="email" placeholder="you@example.com" />
+  </div>
+  <button type="button" id="testEmailBtn" class="secondary">Send test</button>
+
+  <div id="message"></div>
+
+  <script src="plugin-api.js"></script>
+</body>
+</html>
