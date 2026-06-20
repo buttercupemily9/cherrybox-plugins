@@ -21,17 +21,20 @@ public sealed class DownloadService : IDownloadService
     private readonly IDownloadHistoryStore _history;
     private readonly IConfigManager _config;
     private readonly IDownloadJobTracker _jobTracker;
+    private readonly IPlatformPaths _paths;
 
     public DownloadService(
         CherryBoxDbContext db,
         IDownloadHistoryStore history,
         IConfigManager config,
-        IDownloadJobTracker jobTracker)
+        IDownloadJobTracker jobTracker,
+        IPlatformPaths paths)
     {
         _db = db;
         _history = history;
         _config = config;
         _jobTracker = jobTracker;
+        _paths = paths;
     }
 
     public async Task<EnqueueDownloadResult> EnqueueAsync(
@@ -180,6 +183,199 @@ public sealed class DownloadService : IDownloadService
 
     public Task<IReadOnlyList<DownloadHistoryEntry>> ListHistoryAsync(CancellationToken cancellationToken = default) =>
         _history.ListAsync(cancellationToken: cancellationToken);
+
+    public Task<IReadOnlyList<DownloadSiteAuthDto>> ListSiteAuthAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = _config.Current.Download.SiteAuth
+            .OrderBy(e => e.SiteKey, StringComparer.OrdinalIgnoreCase)
+            .Select(ToSiteAuthDto)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<DownloadSiteAuthDto>>(entries);
+    }
+
+    public async Task<DownloadSiteAuthDto> UpsertSiteAuthAsync(
+        UpsertDownloadSiteAuthRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var siteKey = YtDlpAuthHelper.NormalizeSiteKey(request.SiteKey);
+        if (string.IsNullOrWhiteSpace(siteKey))
+            throw new InvalidOperationException("Site name is required.");
+
+        var authMode = NormalizeAuthMode(request.AuthMode);
+        var existing = _config.Current.Download.SiteAuth
+            .FirstOrDefault(e => string.Equals(e.SiteKey, siteKey, StringComparison.OrdinalIgnoreCase));
+
+        if (existing is null)
+        {
+            existing = new DownloadSiteAuthConfig { SiteKey = siteKey };
+            _config.Current.Download.SiteAuth.Add(existing);
+        }
+
+        existing.AuthMode = authMode;
+        existing.Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim();
+        existing.TestUrl = string.IsNullOrWhiteSpace(request.TestUrl) ? null : request.TestUrl.Trim();
+
+        if (request.Password is not null)
+            existing.Password = string.IsNullOrWhiteSpace(request.Password) ? null : request.Password;
+
+        await _config.SaveAsync(cancellationToken);
+        return ToSiteAuthDto(existing);
+    }
+
+    public async Task RemoveSiteAuthAsync(string siteKey, CancellationToken cancellationToken = default)
+    {
+        var normalized = YtDlpAuthHelper.NormalizeSiteKey(siteKey);
+        if (string.IsNullOrWhiteSpace(normalized))
+            throw new InvalidOperationException("Site name is required.");
+
+        var removed = _config.Current.Download.SiteAuth
+            .FirstOrDefault(e => string.Equals(e.SiteKey, normalized, StringComparison.OrdinalIgnoreCase));
+        if (removed is null)
+            throw new InvalidOperationException($"Site login for \"{normalized}\" was not found.");
+
+        _config.Current.Download.SiteAuth.Remove(removed);
+        await _config.SaveAsync(cancellationToken);
+
+        var cookiesDir = Path.GetDirectoryName(YtDlpAuthHelper.GetCookiesFilePath(_paths, normalized));
+        if (!string.IsNullOrWhiteSpace(cookiesDir) && Directory.Exists(cookiesDir))
+        {
+            try
+            {
+                Directory.Delete(cookiesDir, recursive: true);
+            }
+            catch
+            {
+                // Best effort cleanup.
+            }
+        }
+    }
+
+    public async Task<TestDownloadSiteAuthResult> TestSiteAuthAsync(
+        TestDownloadSiteAuthRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var siteKey = YtDlpAuthHelper.NormalizeSiteKey(request.SiteKey);
+        if (string.IsNullOrWhiteSpace(siteKey))
+            throw new InvalidOperationException("Site name is required.");
+
+        var saved = _config.Current.Download.SiteAuth
+            .FirstOrDefault(e => string.Equals(e.SiteKey, siteKey, StringComparison.OrdinalIgnoreCase));
+        var authMode = NormalizeAuthMode(request.AuthMode ?? saved?.AuthMode ?? DownloadSiteAuthModes.Credentials);
+        var entry = new DownloadSiteAuthConfig
+        {
+            SiteKey = siteKey,
+            AuthMode = authMode,
+            Username = string.IsNullOrWhiteSpace(request.Username) ? saved?.Username : request.Username.Trim(),
+            Password = request.Password ?? saved?.Password,
+            TestUrl = string.IsNullOrWhiteSpace(request.TestUrl) ? saved?.TestUrl : request.TestUrl.Trim()
+        };
+
+        var testUrl = entry.TestUrl;
+        if (string.IsNullOrWhiteSpace(testUrl))
+            throw new InvalidOperationException("A test URL is required. Enter a page that requires login on this site.");
+
+        try
+        {
+            var ytDlp = ResolveYtDlp();
+            var args = new List<string> { "--simulate", "--no-warnings", "--print", "extractor" };
+            YtDlpAuthHelper.AppendAuthArguments(args, entry, _paths);
+            args.Add(testUrl);
+
+            var result = await YtDlpAuthHelper.RunAsync(ytDlp, args, cancellationToken);
+            if (result.ExitCode != 0)
+            {
+                return new TestDownloadSiteAuthResult(
+                    false,
+                    string.IsNullOrWhiteSpace(result.CombinedOutput)
+                        ? "yt-dlp could not access the test URL with the provided login."
+                        : result.CombinedOutput,
+                    null);
+            }
+
+            var extractor = result.StdOut.Trim();
+            return new TestDownloadSiteAuthResult(
+                true,
+                string.IsNullOrWhiteSpace(extractor)
+                    ? "Login test succeeded."
+                    : $"Login test succeeded (extractor: {extractor}).",
+                string.IsNullOrWhiteSpace(extractor) ? null : extractor);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new TestDownloadSiteAuthResult(false, ex.Message, null);
+        }
+    }
+
+    public async Task<DownloadSiteAuthDto> UploadSiteCookiesAsync(
+        string siteKey,
+        Stream cookiesFile,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = YtDlpAuthHelper.NormalizeSiteKey(siteKey);
+        if (string.IsNullOrWhiteSpace(normalized))
+            throw new InvalidOperationException("Site name is required.");
+
+        if (cookiesFile is null || !cookiesFile.CanRead)
+            throw new InvalidOperationException("Cookie file is required.");
+
+        var cookiesPath = YtDlpAuthHelper.GetCookiesFilePath(_paths, normalized);
+        Directory.CreateDirectory(Path.GetDirectoryName(cookiesPath)!);
+
+        await using var output = File.Create(cookiesPath);
+        await cookiesFile.CopyToAsync(output, cancellationToken);
+
+        var existing = _config.Current.Download.SiteAuth
+            .FirstOrDefault(e => string.Equals(e.SiteKey, normalized, StringComparison.OrdinalIgnoreCase));
+        if (existing is null)
+        {
+            existing = new DownloadSiteAuthConfig
+            {
+                SiteKey = normalized,
+                AuthMode = DownloadSiteAuthModes.Cookies
+            };
+            _config.Current.Download.SiteAuth.Add(existing);
+        }
+        else
+        {
+            existing.AuthMode = DownloadSiteAuthModes.Cookies;
+        }
+
+        await _config.SaveAsync(cancellationToken);
+        return ToSiteAuthDto(existing);
+    }
+
+    private DownloadSiteAuthDto ToSiteAuthDto(DownloadSiteAuthConfig entry)
+    {
+        var cookiesPath = YtDlpAuthHelper.GetCookiesFilePath(_paths, entry.SiteKey);
+        return new DownloadSiteAuthDto(
+            entry.SiteKey,
+            entry.AuthMode,
+            entry.Username,
+            !string.IsNullOrWhiteSpace(entry.Password),
+            File.Exists(cookiesPath),
+            entry.TestUrl);
+    }
+
+    private static string NormalizeAuthMode(string authMode)
+    {
+        if (string.Equals(authMode, DownloadSiteAuthModes.Cookies, StringComparison.OrdinalIgnoreCase))
+            return DownloadSiteAuthModes.Cookies;
+
+        return DownloadSiteAuthModes.Credentials;
+    }
+
+    private string ResolveYtDlp()
+    {
+        var configured = _config.Current.YtDlpPath;
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
+            return configured;
+
+        var bundled = _paths.GetToolPath("yt-dlp");
+        if (File.Exists(bundled))
+            return bundled;
+
+        return "yt-dlp";
+    }
 
     private async Task<EnqueueDownloadResult> CreateBlockedResultAsync(
         string url,
@@ -426,20 +622,33 @@ public sealed class DownloadWorker
         Directory.CreateDirectory(folder);
 
         var outputTemplate = Path.Combine(folder, "%(title)s [%(id)s].%(ext)s");
-        var args = $"-o \"{outputTemplate}\" --write-info-json \"{job.Url}\"";
+        var args = new List<string>
+        {
+            "-o",
+            outputTemplate,
+            "--write-info-json"
+        };
+
+        var siteAuth = YtDlpAuthHelper.MatchSiteAuth(job.Url, _configManager.Current.Download.SiteAuth);
+        if (siteAuth is not null)
+            YtDlpAuthHelper.AppendAuthArguments(args, siteAuth, _paths);
+
+        args.Add(job.Url);
 
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = ytDlp,
-                Arguments = args,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
         };
+        foreach (var argument in args)
+            process.StartInfo.ArgumentList.Add(argument);
+
         process.Start();
         _jobTracker.Register(job.Id, process);
         try

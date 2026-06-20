@@ -39,6 +39,36 @@ const api = {
   getDownloadSettings: () => apiRequest('/settings/downloads'),
   updateDownloadSettings: (data) =>
     apiRequest('/settings/downloads', { method: 'PUT', body: JSON.stringify(data) }),
+  listSiteAuth: () => apiRequest('/settings/downloads/site-auth'),
+  upsertSiteAuth: (data) =>
+    apiRequest('/settings/downloads/site-auth', { method: 'PUT', body: JSON.stringify(data) }),
+  removeSiteAuth: (siteKey) =>
+    apiRequest(`/settings/downloads/site-auth/${encodeURIComponent(siteKey)}`, { method: 'DELETE' }),
+  testSiteAuth: (data) =>
+    apiRequest('/settings/downloads/site-auth/test', { method: 'POST', body: JSON.stringify(data) }),
+  uploadSiteCookies: async (siteKey, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers = {};
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(
+      `${API_BASE}/settings/downloads/site-auth/${encodeURIComponent(siteKey)}/cookies`,
+      { method: 'POST', headers, body: formData },
+    );
+    const text = await response.text();
+    if (!response.ok) {
+      let message = text || response.statusText;
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.error) message = parsed.error;
+      } catch {
+        // keep raw text
+      }
+      throw new Error(message);
+    }
+    return text ? JSON.parse(text) : null;
+  },
   listFolders: () => apiRequest('/library/folders'),
 };
 

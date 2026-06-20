@@ -23,7 +23,7 @@
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Backup",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Backup/icon.png",
       "screenshotUrls": [],
-      "changelog": "Backup plugin marker; core backup logic ships in CherryBox."
+      "changelog": "Self-contained Backup settings tab with HTML UI in the plugin web folder."
     },
     {
       "id": "story-sites",

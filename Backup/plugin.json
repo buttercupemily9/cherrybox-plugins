@@ -3,5 +3,14 @@
   "name": "Backup",
   "version": "1.0.0",
   "entryAssembly": "Backup.Plugin.dll",
-  "entryType": "Backup.Plugin.BackupPlugin"
+  "entryType": "Backup.Plugin.BackupPlugin",
+  "settingsTabs": [
+    {
+      "id": "backup",
+      "label": "Backup",
+      "icon": "backup",
+      "page": "backup.html",
+      "order": 80
+    }
+  ]
 }

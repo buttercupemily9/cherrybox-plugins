@@ -34,6 +34,33 @@ public sealed record UpdateDownloadSettingsRequest(
     bool AutoRetryFailedDownloads,
     int AutoRetryDelayMinutes);
 
+public sealed record DownloadSiteAuthDto(
+    string SiteKey,
+    string AuthMode,
+    string? Username,
+    bool HasPassword,
+    bool HasCookiesFile,
+    string? TestUrl);
+
+public sealed record UpsertDownloadSiteAuthRequest(
+    string SiteKey,
+    string AuthMode,
+    string? Username,
+    string? Password,
+    string? TestUrl);
+
+public sealed record TestDownloadSiteAuthRequest(
+    string SiteKey,
+    string? TestUrl,
+    string? AuthMode,
+    string? Username,
+    string? Password);
+
+public sealed record TestDownloadSiteAuthResult(
+    bool Success,
+    string Message,
+    string? Extractor);
+
 public sealed record DownloadHistoryEntry(
     string NormalizedUrl,
     string OriginalUrl,
@@ -53,4 +80,9 @@ public interface IDownloadService
     Task<DownloadSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task<DownloadSettingsDto> UpdateSettingsAsync(UpdateDownloadSettingsRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DownloadHistoryEntry>> ListHistoryAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DownloadSiteAuthDto>> ListSiteAuthAsync(CancellationToken cancellationToken = default);
+    Task<DownloadSiteAuthDto> UpsertSiteAuthAsync(UpsertDownloadSiteAuthRequest request, CancellationToken cancellationToken = default);
+    Task RemoveSiteAuthAsync(string siteKey, CancellationToken cancellationToken = default);
+    Task<TestDownloadSiteAuthResult> TestSiteAuthAsync(TestDownloadSiteAuthRequest request, CancellationToken cancellationToken = default);
+    Task<DownloadSiteAuthDto> UploadSiteCookiesAsync(string siteKey, Stream cookiesFile, CancellationToken cancellationToken = default);
 }

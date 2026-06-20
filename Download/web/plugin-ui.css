@@ -123,3 +123,89 @@ button:disabled {
 .settings-section:last-child {
   margin-bottom: 0;
 }
+
+.site-search-row {
+  position: relative;
+}
+
+.site-suggestions {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+
+.site-suggestions button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+}
+
+.site-suggestions button:hover {
+  background: var(--bg);
+}
+
+.site-cards {
+  display: grid;
+  gap: 1rem;
+}
+
+.site-card {
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.site-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.site-card__header h2 {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.auth-mode-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.auth-panel.hidden {
+  display: none;
+}
+
+.site-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+button.danger {
+  color: var(--error);
+  border-color: #f3c9c9;
+}
+
+.test-result.success {
+  color: #027a48;
+}
+
+.hidden {
+  display: none !important;
+}
