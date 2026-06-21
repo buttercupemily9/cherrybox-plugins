@@ -1,0 +1,8 @@
+{
+  "id": "social",
+  "name": "Social",
+  "version": "1.0.0",
+  "entryAssembly": "Social.Plugin.dll",
+  "entryType": "CherryBox.Social.Plugin.SocialPlugin",
+  "mainTabs": []
+}
