@@ -110,6 +110,14 @@
     });
   }
 
+  function browseFolders(path, options) {
+    var params = new URLSearchParams();
+    if (path) params.set('path', path);
+    if (options && options.includeFiles) params.set('includeFiles', 'true');
+    var query = params.toString();
+    return apiRequest('/api/v1/system/browse' + (query ? '?' + query : ''));
+  }
+
   function ensureStylesheet(id, href) {
     if (!href) return null;
     var existing = document.getElementById(id);
@@ -288,5 +296,6 @@
     pluginWebUrl: pluginWebUrl,
     normalizeSkin: normalizeSkin,
     bootstrapTheme: bootstrapTheme,
+    browseFolders: browseFolders,
   };
 })(window);

@@ -1,0 +1,16 @@
+{
+  "id": "achievements",
+  "name": "Achievements",
+  "version": "1.0.0",
+  "entryAssembly": "Achievements.Plugin.dll",
+  "entryType": "CherryBox.Achievements.Plugin.AchievementsPlugin",
+  "mainTabs": [
+    {
+      "id": "achievements",
+      "label": "Achievements",
+      "icon": "trophy",
+      "page": "index.html",
+      "order": 95
+    }
+  ]
+}

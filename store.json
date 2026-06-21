@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 4,
+  "catalogVersion": 6,
   "plugins": [
     {
       "id": "hello-cherrybox",
@@ -72,6 +72,30 @@
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/ViewTime/icon.png",
       "screenshotUrls": [],
       "changelog": "Move account advanced time management into a plugin settings tab."
+    },
+    {
+      "id": "achievements",
+      "folder": "Achievements",
+      "name": "Achievements",
+      "version": "1.0.0",
+      "description": "Unlock viewing badges for plays, pulses, favorites, ratings, and stories.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Achievements",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Achievements/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial achievements plugin with in-app viewing milestones."
+    },
+    {
+      "id": "social",
+      "folder": "Social",
+      "name": "Social",
+      "version": "1.0.0",
+      "description": "Comments, likes, dislikes, friends, messaging, and public profile likes.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Social",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Social/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial social plugin with messaging, friends, and media engagement."
     }
   ]
 }

@@ -16,7 +16,7 @@
   "settingsTabs": [
     {
       "id": "queue",
-      "label": "Queue",
+      "label": "Download settings",
       "icon": "queue",
       "page": "queue.html",
       "order": 90

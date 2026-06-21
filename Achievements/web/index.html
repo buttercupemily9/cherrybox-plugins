@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Achievements</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
+</head>
+<body>
+  <div class="card achievements-page">
+    <h1>Achievements</h1>
+    <p class="meta">Unlock badges by watching, pulsing, favoriting, and rating inside CherryBox.</p>
+
+    <div id="message" class="plugin-message" hidden></div>
+
+    <div class="achievements-summary">
+      <div class="achievements-summary__stat">
+        <strong id="unlocked-count">0</strong>
+        <span>Unlocked</span>
+      </div>
+      <div class="achievements-summary__stat">
+        <strong id="total-count">0</strong>
+        <span>Total</span>
+      </div>
+      <button type="button" id="sync-btn" class="secondary">Refresh progress</button>
+    </div>
+
+    <div class="achievement-filter" id="category-filter"></div>
+    <div id="achievements" class="achievement-grid"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.CherryBoxPluginApi) {
+        CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+          console.warn('CherryBox plugin theme init failed', err);
+        });
+      }
+
+      var ui = window.AchievementsPluginUi;
+      if (!ui) return;
+
+      var api = ui.api;
+      var escapeHtml = ui.escapeHtml;
+      var formatTime = ui.formatTime;
+      var messageEl = document.getElementById('message');
+      var allAchievements = [];
+      var activeCategory = 'All';
+
+      function showMessage(text, isError) {
+        messageEl.hidden = false;
+        messageEl.textContent = text;
+        messageEl.className = 'plugin-message' + (isError ? ' error' : '');
+      }
+
+      function renderFilters(categories) {
+        var filterEl = document.getElementById('category-filter');
+        var buttons = ['All'].concat(categories);
+        filterEl.innerHTML = buttons.map(function (category) {
+          return (
+            '<button type="button" data-category="' + escapeHtml(category) + '"' +
+            (category === activeCategory ? ' class="active"' : '') + '>' +
+            escapeHtml(category) +
+            '</button>'
+          );
+        }).join('');
+
+        filterEl.querySelectorAll('button').forEach(function (button) {
+          button.addEventListener('click', function () {
+            activeCategory = button.getAttribute('data-category') || 'All';
+            renderFilters(categories);
+            renderAchievements();
+          });
+        });
+      }
+
+      function renderAchievements() {
+        var el = document.getElementById('achievements');
+        var items = activeCategory === 'All'
+          ? allAchievements
+          : allAchievements.filter(function (item) { return item.category === activeCategory; });
+
+        if (!items.length) {
+          el.innerHTML = '<p class="meta">No achievements in this category.</p>';
+          return;
+        }
+
+        el.innerHTML = items.map(function (item) {
+          var percent = item.target > 0 ? Math.min(100, Math.round((item.progress / item.target) * 100)) : 0;
+          return (
+            '<article class="achievement-card' + (item.unlocked ? ' unlocked' : '') + '">' +
+              '<div class="achievement-card__header">' +
+                '<strong>' + escapeHtml(item.title) + '</strong>' +
+                '<span class="achievement-card__badge">' + (item.unlocked ? 'Unlocked' : 'Locked') + '</span>' +
+              '</div>' +
+              '<div class="achievement-card__category">' + escapeHtml(item.category) + '</div>' +
+              '<p class="meta">' + escapeHtml(item.description) + '</p>' +
+              '<div class="achievement-card__progress">' +
+                '<div class="achievement-card__progress-bar">' +
+                  '<div class="achievement-card__progress-fill" style="width:' + percent + '%"></div>' +
+                '</div>' +
+                '<div class="achievement-card__progress-label">' + item.progress + ' / ' + item.target + '</div>' +
+              '</div>' +
+              (item.unlockedAt
+                ? '<p class="achievement-card__unlocked-at meta">Unlocked ' + escapeHtml(formatTime(item.unlockedAt)) + '</p>'
+                : '') +
+            '</article>'
+          );
+        }).join('');
+      }
+
+      async function refresh() {
+        var results = await Promise.all([api.listAchievements(), api.getAchievementSummary()]);
+        allAchievements = results[0];
+        var summary = results[1];
+        document.getElementById('unlocked-count').textContent = String(summary.unlockedCount);
+        document.getElementById('total-count').textContent = String(summary.totalCount);
+        var categories = Array.from(new Set(allAchievements.map(function (item) { return item.category; }))).sort();
+        renderFilters(categories);
+        renderAchievements();
+      }
+
+      document.getElementById('sync-btn').addEventListener('click', async function () {
+        var button = document.getElementById('sync-btn');
+        button.disabled = true;
+        try {
+          var unlocks = await api.syncAchievements();
+          await refresh();
+          if (unlocks.length) {
+            showMessage('Unlocked ' + unlocks.length + ' new achievement' + (unlocks.length === 1 ? '' : 's') + '!');
+          } else {
+            showMessage('Progress refreshed.');
+          }
+        } catch (err) {
+          showMessage(err.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      refresh().catch(function (err) {
+        showMessage(err.message, true);
+      });
+    });
+  </script>
+</body>
+</html>

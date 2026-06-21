@@ -84,7 +84,7 @@ public sealed class DownloadService : IDownloadService
         {
             Url = url,
             NormalizedUrl = normalized,
-            TargetFolderId = request.TargetFolderId,
+            TargetFolderId = await ResolveTargetFolderIdAsync(request.TargetFolderId, cancellationToken),
             CreatedByUserId = userId,
             Status = DownloadJobStatus.Pending
         };
@@ -163,6 +163,7 @@ public sealed class DownloadService : IDownloadService
     {
         var download = _config.Current.Download;
         return Task.FromResult(new DownloadSettingsDto(
+            download.AllowNonAdminUsers,
             download.AutoRetryFailedDownloads,
             download.AutoRetryDelayMinutes,
             download.HistoryDatabaseFileName));
@@ -175,6 +176,7 @@ public sealed class DownloadService : IDownloadService
         if (request.AutoRetryDelayMinutes < 1)
             throw new InvalidOperationException("Auto-retry delay must be at least 1 minute.");
 
+        _config.Current.Download.AllowNonAdminUsers = request.AllowNonAdminUsers;
         _config.Current.Download.AutoRetryFailedDownloads = request.AutoRetryFailedDownloads;
         _config.Current.Download.AutoRetryDelayMinutes = request.AutoRetryDelayMinutes;
         await _config.SaveAsync(cancellationToken);
@@ -342,6 +344,19 @@ public sealed class DownloadService : IDownloadService
 
         await _config.SaveAsync(cancellationToken);
         return ToSiteAuthDto(existing);
+    }
+
+    private async Task<Guid> ResolveTargetFolderIdAsync(Guid? folderId, CancellationToken cancellationToken)
+    {
+        if (folderId.HasValue)
+        {
+            var folder = await _db.LibraryFolders.FindAsync([folderId.Value], cancellationToken);
+            if (folder is null)
+                throw new InvalidOperationException("Target library folder was not found.");
+            return folder.Id;
+        }
+
+        return (await DownloadPaths.EnsureDefaultDownloadFolderAsync(_db, _paths, cancellationToken)).Id;
     }
 
     private DownloadSiteAuthDto ToSiteAuthDto(DownloadSiteAuthConfig entry)
@@ -562,8 +577,15 @@ public sealed class DownloadWorker
             await db.SaveChangesAsync(stoppingToken);
 
             var scanner = scope.ServiceProvider.GetRequiredService<ILibraryScanner>();
-            if (job.TargetFolderId.HasValue)
-                await scanner.ScanFolderAsync(job.TargetFolderId.Value, stoppingToken);
+            var folderId = job.TargetFolderId
+                ?? (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, stoppingToken)).Id;
+            if (!job.TargetFolderId.HasValue)
+            {
+                job.TargetFolderId = folderId;
+                await db.SaveChangesAsync(stoppingToken);
+            }
+
+            await scanner.ScanFolderAsync(folderId, stoppingToken);
 
             var metadata = scope.ServiceProvider.GetRequiredService<StashBoxMetadataService>();
             var encoder = scope.ServiceProvider.GetRequiredService<IMediaEncoder>();
@@ -618,7 +640,17 @@ public sealed class DownloadWorker
     private async Task<string> RunYtDlpAsync(DownloadJob job, CancellationToken cancellationToken)
     {
         var ytDlp = ResolveYtDlp();
-        var folder = await GetOutputFolderAsync(job.TargetFolderId, cancellationToken);
+        EnsureYtDlpAvailable(ytDlp);
+
+        var folderId = job.TargetFolderId;
+        if (!folderId.HasValue)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
+            folderId = (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, cancellationToken)).Id;
+        }
+
+        var folder = await GetOutputFolderAsync(folderId, cancellationToken);
         Directory.CreateDirectory(folder);
 
         var outputTemplate = Path.Combine(folder, "%(title)s [%(id)s].%(ext)s");
@@ -626,8 +658,16 @@ public sealed class DownloadWorker
         {
             "-o",
             outputTemplate,
-            "--write-info-json"
+            "--write-info-json",
+            "--no-progress"
         };
+
+        var ffmpegDir = ResolveFfmpegDirectory();
+        if (!string.IsNullOrWhiteSpace(ffmpegDir))
+        {
+            args.Add("--ffmpeg-location");
+            args.Add(ffmpegDir);
+        }
 
         var siteAuth = YtDlpAuthHelper.MatchSiteAuth(job.Url, _configManager.Current.Download.SiteAuth);
         if (siteAuth is not null)
@@ -653,8 +693,12 @@ public sealed class DownloadWorker
         _jobTracker.Register(job.Id, process);
         try
         {
-            var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask);
             await process.WaitForExitAsync(cancellationToken);
+
+            var stderr = stderrTask.Result;
             if (process.ExitCode != 0)
                 throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr)
                     ? "yt-dlp exited with non-zero code"
@@ -686,9 +730,7 @@ public sealed class DownloadWorker
             if (folder is not null) return folder.Path;
         }
 
-        var defaultPath = Path.Combine(_paths.ProgramDataDirectory, "downloads");
-        Directory.CreateDirectory(defaultPath);
-        return defaultPath;
+        return (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, cancellationToken)).Path;
     }
 
     private string ResolveYtDlp()
@@ -697,7 +739,33 @@ public sealed class DownloadWorker
         if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured)) return configured;
         var bundled = _paths.GetToolPath("yt-dlp");
         if (File.Exists(bundled)) return bundled;
-        return "yt-dlp";
+        return OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp";
+    }
+
+    private static void EnsureYtDlpAvailable(string ytDlpPath)
+    {
+        if (File.Exists(ytDlpPath))
+            return;
+
+        if (Path.IsPathRooted(ytDlpPath))
+            throw new InvalidOperationException(
+                $"yt-dlp was not found at '{ytDlpPath}'. Install it from Settings → Updating → Support apps.");
+
+        throw new InvalidOperationException(
+            "yt-dlp is not installed. Install it from Settings → Updating → Support apps, or set YtDlpPath in config.");
+    }
+
+    private string? ResolveFfmpegDirectory()
+    {
+        var configured = _configManager.Current.FfmpegPath;
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
+            return Path.GetDirectoryName(configured);
+
+        var bundled = _paths.GetToolPath("ffmpeg");
+        if (File.Exists(bundled))
+            return Path.GetDirectoryName(bundled);
+
+        return null;
     }
 
     private static async Task<string?> TryLoadInfoJsonAsync(string outputPath, CancellationToken cancellationToken)
@@ -723,5 +791,37 @@ public sealed class DownloadWorker
         }
 
         return null;
+    }
+}
+
+internal static class DownloadPaths
+{
+    public static string GetDefaultDownloadDirectory(IPlatformPaths paths) =>
+        Path.Combine(paths.ProgramDataDirectory, "downloads");
+
+    public static async Task<LibraryFolder> EnsureDefaultDownloadFolderAsync(
+        CherryBoxDbContext db,
+        IPlatformPaths paths,
+        CancellationToken cancellationToken)
+    {
+        var downloadPath = Path.GetFullPath(GetDefaultDownloadDirectory(paths));
+        Directory.CreateDirectory(downloadPath);
+
+        var folders = await db.LibraryFolders.ToListAsync(cancellationToken);
+        var existing = folders.FirstOrDefault(f =>
+            string.Equals(Path.GetFullPath(f.Path), downloadPath, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+            return existing;
+
+        var folder = new LibraryFolder
+        {
+            Path = downloadPath,
+            DisplayName = "Downloads",
+            ContentKind = ContentKind.Video,
+            Enabled = true
+        };
+        db.LibraryFolders.Add(folder);
+        await db.SaveChangesAsync(cancellationToken);
+        return folder;
     }
 }

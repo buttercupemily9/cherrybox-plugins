@@ -1,7 +1,8 @@
 # Build installable plugin packages for the CherryBox plugin store.
 param(
     [string]$Configuration = "Release",
-    [string]$Output = "packages"
+    [string]$Output = "packages",
+    [string]$ThemeSource = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,7 +10,11 @@ $root = $PSScriptRoot
 $outDir = Join-Path $root $Output
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-& (Join-Path $root "sync-cherrybox-theme.ps1") -PluginsRoot $root
+$syncArgs = @{ PluginsRoot = $root }
+if (-not [string]::IsNullOrWhiteSpace($ThemeSource)) {
+    $syncArgs.Source = $ThemeSource
+}
+& (Join-Path $root "sync-cherrybox-theme.ps1") @syncArgs
 
 $plugins = Get-ChildItem -Path $root -Directory | ForEach-Object {
     $manifestPath = Join-Path $_.FullName "plugin.json"

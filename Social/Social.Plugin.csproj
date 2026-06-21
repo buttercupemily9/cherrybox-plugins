@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Social.Plugin</AssemblyName>
+    <RootNamespace>CherryBox.Social.Plugin</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CherryBox.Plugins.Abstractions\CherryBox.Plugins.Abstractions.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="$(CherryBoxSrc)\CherryBox.Core\CherryBox.Core.csproj" />
+    <ProjectReference Include="$(CherryBoxSrc)\CherryBox.Data\CherryBox.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="plugin-ui.css" />
     <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
     <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+    <script src="cherrybox/cherrybox-folder-browser.js" defer></script>
     <script src="plugin-api.js" defer></script>
   </head>
   <body>
@@ -44,14 +45,8 @@
         <h2>Backup settings</h2>
         <form id="settings-form">
           <div class="form-row">
-            <label for="backups-directory">Backup folder</label>
-            <input
-              id="backups-directory"
-              name="backupsDirectory"
-              placeholder="plugins/backup/backups"
-              required
-            />
-            <p class="meta" id="storage-folder"></p>
+            <label for="backups-directory-browser">Backup folder</label>
+            <div id="backups-directory-browser"></div>
           </div>
           <div class="form-row">
             <label for="max-stored">Max stored backups</label>
@@ -89,6 +84,8 @@
 
             var messageEl = document.getElementById('message');
             var actionBusy = null;
+            var backupFolderBrowser = null;
+            var backupFolderRelative = '';
 
             function renderBackups(backups) {
               var el = document.getElementById('backups');
@@ -221,15 +218,33 @@
               });
             }
 
+            function mountBackupFolderBrowser(settings) {
+              var container = document.getElementById('backups-directory-browser');
+              if (!container || !window.CherryBoxFolderBrowser) return;
+
+              backupFolderRelative = settings.backupsDirectory;
+              backupFolderBrowser = CherryBoxFolderBrowser.mountProgramData(container, {
+                programDataDirectory: settings.programDataDirectory,
+                resolvedPath: settings.resolvedBackupsPath,
+                relativeValue: settings.backupsDirectory,
+                onChange: function (relative) {
+                  backupFolderRelative = relative;
+                },
+              });
+            }
+
             async function refresh() {
               var results = await Promise.all([api.listBackups(), api.getBackupSettings()]);
               var backups = results[0];
               var settings = results[1];
               renderBackups(backups);
               document.getElementById('max-stored').value = settings.maxStoredBackups;
-              document.getElementById('backups-directory').value = settings.backupsDirectory;
-              document.getElementById('storage-folder').textContent =
-                'Resolved path: ' + settings.resolvedBackupsPath;
+              if (backupFolderBrowser) {
+                backupFolderBrowser.setValues(settings.backupsDirectory, settings.resolvedBackupsPath);
+                backupFolderRelative = settings.backupsDirectory;
+              } else {
+                mountBackupFolderBrowser(settings);
+              }
             }
 
             document.getElementById('create-btn').addEventListener('click', async function () {
@@ -252,7 +267,10 @@
               button.disabled = true;
               try {
                 await api.updateBackupSettings({
-                  backupsDirectory: document.getElementById('backups-directory').value.trim(),
+                  backupsDirectory: (backupFolderBrowser
+                    ? backupFolderBrowser.getRelativeValue()
+                    : backupFolderRelative
+                  ).trim(),
                   maxStoredBackups: Math.max(
                     1,
                     Number(document.getElementById('max-stored').value) || 1
