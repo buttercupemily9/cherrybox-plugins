@@ -40,13 +40,7 @@
 
       <form id="settings-form">
 
-        <div class="form-row">
-
-          <label><input type="checkbox" id="allow-non-admin" /> Allow non-admin users to download</label>
-
-        </div>
-
-        <p class="meta">When unchecked, only administrators can use the Downloads tab and download API. Other users will not see Downloads in the sidebar.</p>
+        <p class="meta">Non-admin download access is managed per user in Account settings.</p>
 
         <div class="form-row">
 
@@ -186,6 +180,10 @@
 
 
 
+      var currentSettings = null;
+
+
+
       async function refresh() {
 
         var results = await Promise.all([api.listDownloadHistory(), api.getDownloadSettings()]);
@@ -194,9 +192,9 @@
 
         var settings = results[1];
 
-        renderHistory(history);
+        currentSettings = settings;
 
-        document.getElementById('allow-non-admin').checked = settings.allowNonAdminUsers;
+        renderHistory(history);
 
         document.getElementById('auto-retry').checked = settings.autoRetryFailedDownloads;
 
@@ -222,7 +220,7 @@
 
           await api.updateDownloadSettings({
 
-            allowNonAdminUsers: document.getElementById('allow-non-admin').checked,
+            allowNonAdminUsers: currentSettings ? currentSettings.allowNonAdminUsers : false,
 
             autoRetryFailedDownloads: document.getElementById('auto-retry').checked,
 

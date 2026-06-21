@@ -3,14 +3,5 @@
   "name": "View time limits",
   "version": "1.0.0",
   "entryAssembly": "ViewTime.Plugin.dll",
-  "entryType": "ViewTime.Plugin.ViewTimePlugin",
-  "settingsTabs": [
-    {
-      "id": "limits",
-      "label": "View time",
-      "icon": "clock",
-      "page": "view-time.html",
-      "order": 75
-    }
-  ]
+  "entryType": "ViewTime.Plugin.ViewTimePlugin"
 }
