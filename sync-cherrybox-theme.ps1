@@ -41,7 +41,8 @@ $files = @(
     "stock-components.css",
     "stock-plugin.css",
     "cherrybox-plugin-shell.js",
-    "cherrybox-plugin-api.js"
+    "cherrybox-plugin-api.js",
+    "cherrybox-folder-browser.js"
 )
 
 $synced = 0

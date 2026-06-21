@@ -26,11 +26,13 @@ public sealed record EnqueueDownloadResult(
     string? ExistingMediaTitle);
 
 public sealed record DownloadSettingsDto(
+    bool AllowNonAdminUsers,
     bool AutoRetryFailedDownloads,
     int AutoRetryDelayMinutes,
     string HistoryDatabaseFileName);
 
 public sealed record UpdateDownloadSettingsRequest(
+    bool AllowNonAdminUsers,
     bool AutoRetryFailedDownloads,
     int AutoRetryDelayMinutes);
 

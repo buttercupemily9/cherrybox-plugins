@@ -1,296 +1,269 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
   <meta charset="utf-8" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Download queue</title>
+
+  <title>Download settings</title>
+
   <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+
   <link rel="stylesheet" href="plugin-ui.css" />
+
   <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+
   <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+
   <script src="plugin-api.js" defer></script>
+
 </head>
+
 <body>
+
   <div class="card download-page">
-    <h1>Download queue</h1>
-    <p class="meta">Queue URLs for yt-dlp. Already-downloaded URLs are blocked using the download history database.</p>
+
+    <h1>Download settings</h1>
+
+    <p class="meta">Configure retries and review download history. Use the Downloads tab in the sidebar to queue URLs and manage the active queue.</p>
+
     <div id="message" class="plugin-message" hidden></div>
 
-    <div class="settings-section">
-      <h2>Queue download</h2>
-      <form id="queue-form">
-        <div class="form-row">
-          <label for="url">URL</label>
-          <input id="url" name="url" placeholder="https://…" required />
-        </div>
-        <div class="form-row">
-          <label for="folder">Target folder</label>
-          <select id="folder" name="folder">
-            <option value="">Default downloads folder</option>
-          </select>
-        </div>
-        <button type="submit" id="queue-btn">Queue download</button>
-      </form>
-    </div>
+
 
     <div class="settings-section">
-      <h2>Queued &amp; recent downloads</h2>
-      <div id="downloads"></div>
-    </div>
 
-    <div class="settings-section">
       <h2>Download settings</h2>
+
       <form id="settings-form">
+
         <div class="form-row">
+
+          <label><input type="checkbox" id="allow-non-admin" /> Allow non-admin users to download</label>
+
+        </div>
+
+        <p class="meta">When unchecked, only administrators can use the Downloads tab and download API. Other users will not see Downloads in the sidebar.</p>
+
+        <div class="form-row">
+
           <label><input type="checkbox" id="auto-retry" /> Auto-retry failed downloads</label>
+
         </div>
+
         <div class="form-row">
+
           <label for="retry-minutes">Retry after (minutes)</label>
+
           <input id="retry-minutes" type="number" min="1" step="1" value="60" />
+
         </div>
+
         <p class="meta" id="history-db"></p>
+
         <button type="submit" id="settings-btn">Save download settings</button>
+
       </form>
+
     </div>
 
+
+
     <div class="settings-section">
+
       <h2>Download history</h2>
+
       <div id="history"></div>
+
     </div>
+
   </div>
 
+
+
   <script>
+
     document.addEventListener('DOMContentLoaded', function () {
+
       if (window.CherryBoxPluginApi) {
+
         CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+
           console.warn('CherryBox plugin theme init failed', err);
+
         });
+
       }
+
+
 
       var ui = window.DownloadPluginUi;
+
       if (!ui) {
+
         var messageEl = document.getElementById('message');
+
         if (messageEl) {
+
           messageEl.hidden = false;
+
           messageEl.textContent = 'Download plugin UI failed to load.';
+
           messageEl.className = 'plugin-message error';
+
         }
+
         return;
+
       }
 
+
+
       var api = ui.api;
-          var STATUS_LABEL = ui.STATUS_LABEL;
-          var formatTime = ui.formatTime;
-          var escapeHtml = ui.escapeHtml;
-          var showMessage = ui.showMessage;
 
-          var messageEl = document.getElementById('message');
-          var retryBusy = null;
-          var cancelBusy = null;
+      var formatTime = ui.formatTime;
 
-          function canRetry(status) {
-            return status === 'Failed' || status === 'Cancelled' || status === 'Blocked';
-          }
+      var escapeHtml = ui.escapeHtml;
 
-          function canCancel(status) {
-            return status === 'Pending' || status === 'Running';
-          }
+      var showMessage = ui.showMessage;
 
-          function renderDownloads(downloads) {
-            var el = document.getElementById('downloads');
-            if (!downloads.length) {
-              el.innerHTML = '<p class="meta">No downloads queued yet.</p>';
-              return;
-            }
+      var messageEl = document.getElementById('message');
 
-            el.innerHTML =
-              '<ul class="download-list">' +
-              downloads
-                .map(function (d) {
-                  return (
-                    '<li class="download-row">' +
-                    '<div class="download-row__info">' +
-                    '<div class="download-row__header">' +
-                    '<span class="status">' +
-                    escapeHtml(STATUS_LABEL[d.status] ?? d.status) +
-                    '</span>' +
-                    '<a class="download-row__url" href="' +
-                    escapeHtml(d.url) +
-                    '" target="_blank" rel="noreferrer">' +
-                    escapeHtml(d.url) +
-                    '</a>' +
-                    '</div>' +
-                    (d.outputPath
-                      ? '<p class="meta">Saved to ' + escapeHtml(d.outputPath) + '</p>'
-                      : '') +
-                    (d.blockReason || d.errorMessage
-                      ? '<p class="error">' +
-                        escapeHtml(d.blockReason ?? d.errorMessage) +
-                        '</p>'
-                      : '') +
-                    (d.retryAfterAt && d.status === 'Failed'
-                      ? '<p class="meta">Auto-retry after ' + formatTime(d.retryAfterAt) + '</p>'
-                      : '') +
-                    '</div>' +
-                    '<div class="download-row__actions">' +
-                    (canRetry(d.status)
-                      ? '<button type="button" class="secondary" data-retry="' +
-                        d.id +
-                        '">' +
-                        (retryBusy === d.id ? 'Retrying…' : 'Retry') +
-                        '</button>'
-                      : '') +
-                    (canCancel(d.status)
-                      ? '<button type="button" class="secondary" data-cancel="' +
-                        d.id +
-                        '">' +
-                        (cancelBusy === d.id ? 'Cancelling…' : 'Cancel') +
-                        '</button>'
-                      : '') +
-                    '</div>' +
-                    '</li>'
-                  );
-                })
-                .join('') +
-              '</ul>';
 
-            el.querySelectorAll('[data-retry]').forEach(function (button) {
-              button.addEventListener('click', async function () {
-                retryBusy = button.getAttribute('data-retry');
-                await refreshDownloads();
-                try {
-                  await api.retryDownload(retryBusy);
-                  showMessage(messageEl, 'Download re-queued');
-                  await refreshDownloads();
-                } catch (err) {
-                  showMessage(messageEl, err.message, true);
-                } finally {
-                  retryBusy = null;
-                }
-              });
-            });
 
-            el.querySelectorAll('[data-cancel]').forEach(function (button) {
-              button.addEventListener('click', async function () {
-                cancelBusy = button.getAttribute('data-cancel');
-                await refreshDownloads();
-                try {
-                  await api.cancelDownload(cancelBusy);
-                  showMessage(messageEl, 'Download cancelled');
-                  await refreshDownloads();
-                } catch (err) {
-                  showMessage(messageEl, err.message, true);
-                } finally {
-                  cancelBusy = null;
-                }
-              });
-            });
-          }
+      function renderHistory(history) {
 
-          function renderHistory(history) {
-            var el = document.getElementById('history');
-            if (!history.length) {
-              el.innerHTML = '<p class="meta">No download history yet.</p>';
-              return;
-            }
+        var el = document.getElementById('history');
 
-            el.innerHTML =
-              '<ul class="settings-list">' +
-              history
-                .map(function (entry) {
-                  return (
-                    '<li class="settings-list__row">' +
-                    '<strong>' +
-                    escapeHtml(entry.title ?? entry.originalUrl) +
-                    '</strong>' +
-                    '<p class="meta">' +
-                    formatTime(entry.downloadedAt) +
-                    '</p>' +
-                    '</li>'
-                  );
-                })
-                .join('') +
-              '</ul>';
-          }
+        if (!history.length) {
 
-          async function refreshDownloads() {
-            var results = await Promise.all([
-              api.listDownloads(),
-              api.listDownloadHistory(),
-              api.getDownloadSettings(),
-            ]);
-            var downloads = results[0];
-            var history = results[1];
-            var settings = results[2];
-            renderDownloads(downloads);
-            renderHistory(history);
-            document.getElementById('auto-retry').checked = settings.autoRetryFailedDownloads;
-            document.getElementById('retry-minutes').value = settings.autoRetryDelayMinutes;
-            document.getElementById('history-db').textContent =
-              'History database: ' + settings.historyDatabaseFileName;
-          }
+          el.innerHTML = '<p class="meta">No download history yet.</p>';
 
-          async function loadFolders() {
-            var folders = await api.listFolders();
-            var select = document.getElementById('folder');
-            folders.forEach(function (folder) {
-              var option = document.createElement('option');
-              option.value = folder.id;
-              option.textContent = folder.displayName;
-              select.appendChild(option);
-            });
-          }
+          return;
 
-          document.getElementById('queue-form').addEventListener('submit', async function (event) {
-            event.preventDefault();
-            var button = document.getElementById('queue-btn');
-            button.disabled = true;
-            try {
-              var url = document.getElementById('url').value.trim();
-              var folderId = document.getElementById('folder').value || undefined;
-              var result = await api.enqueueDownload(url, folderId);
-              if (!result.accepted) {
-                showMessage(messageEl, result.blockReason ?? 'Download blocked', true);
-              } else {
-                showMessage(messageEl, 'Download queued');
-                document.getElementById('url').value = '';
-              }
-              await refreshDownloads();
-            } catch (err) {
-              showMessage(messageEl, err.message, true);
-            } finally {
-              button.disabled = false;
-            }
+        }
+
+
+
+        el.innerHTML =
+
+          '<ul class="settings-list">' +
+
+          history
+
+            .map(function (entry) {
+
+              return (
+
+                '<li class="settings-list__row">' +
+
+                '<strong>' +
+
+                escapeHtml(entry.title ?? entry.originalUrl) +
+
+                '</strong>' +
+
+                '<p class="meta">' +
+
+                formatTime(entry.downloadedAt) +
+
+                '</p>' +
+
+                '</li>'
+
+              );
+
+            })
+
+            .join('') +
+
+          '</ul>';
+
+      }
+
+
+
+      async function refresh() {
+
+        var results = await Promise.all([api.listDownloadHistory(), api.getDownloadSettings()]);
+
+        var history = results[0];
+
+        var settings = results[1];
+
+        renderHistory(history);
+
+        document.getElementById('allow-non-admin').checked = settings.allowNonAdminUsers;
+
+        document.getElementById('auto-retry').checked = settings.autoRetryFailedDownloads;
+
+        document.getElementById('retry-minutes').value = settings.autoRetryDelayMinutes;
+
+        document.getElementById('history-db').textContent =
+
+          'History database: ' + settings.historyDatabaseFileName;
+
+      }
+
+
+
+      document.getElementById('settings-form').addEventListener('submit', async function (event) {
+
+        event.preventDefault();
+
+        var button = document.getElementById('settings-btn');
+
+        button.disabled = true;
+
+        try {
+
+          await api.updateDownloadSettings({
+
+            allowNonAdminUsers: document.getElementById('allow-non-admin').checked,
+
+            autoRetryFailedDownloads: document.getElementById('auto-retry').checked,
+
+            autoRetryDelayMinutes: Math.max(
+
+              1,
+
+              Number(document.getElementById('retry-minutes').value) || 1
+
+            ),
+
           });
 
-          document.getElementById('settings-form').addEventListener('submit', async function (event) {
-            event.preventDefault();
-            var button = document.getElementById('settings-btn');
-            button.disabled = true;
-            try {
-              await api.updateDownloadSettings({
-                autoRetryFailedDownloads: document.getElementById('auto-retry').checked,
-                autoRetryDelayMinutes: Math.max(
-                  1,
-                  Number(document.getElementById('retry-minutes').value) || 1
-                ),
-              });
-              showMessage(messageEl, 'Download settings saved');
-            } catch (err) {
-              showMessage(messageEl, err.message, true);
-            } finally {
-              button.disabled = false;
-            }
-          });
+          showMessage(messageEl, 'Download settings saved');
 
-          setInterval(function () {
-            refreshDownloads().catch(function () {});
-          }, 4000);
+        } catch (err) {
 
-          Promise.all([loadFolders(), refreshDownloads()]).catch(function (err) {
-            showMessage(messageEl, err.message, true);
-          });
+          showMessage(messageEl, err.message, true);
+
+        } finally {
+
+          button.disabled = false;
+
+        }
+
+      });
+
+
+
+      refresh().catch(function (err) {
+
+        showMessage(messageEl, err.message, true);
+
+      });
+
     });
+
   </script>
+
 </body>
+
 </html>
+
+
