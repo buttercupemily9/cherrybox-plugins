@@ -5,302 +5,420 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Site logins</title>
   <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="/skins/cherrybox-plugin-api.js" defer></script>
+  <script src="supported-sites.js" defer></script>
+  <script src="plugin-api.js" defer></script>
 </head>
 <body>
-  <h1>Site logins</h1>
-  <p class="meta">
-    Add per-site credentials or cookie files for yt-dlp. CherryBox matches the site name against download URLs
-    (typing <code>pornhub</code> applies to <code>pornhub.com</code> links).
-  </p>
-  <div id="message" class="plugin-message" hidden></div>
+  <div class="card download-page">
+    <h1>Site logins</h1>
+    <p class="meta">
+      Search for a yt-dlp supported site, then add username and password or paste cookie text.
+      CherryBox matches the site key against download URLs (e.g. <code>pornhub</code> → <code>pornhub.com</code>).
+    </p>
+    <div id="message" class="plugin-message" hidden></div>
 
-  <div class="settings-section">
-    <h2>Add site</h2>
-    <div class="form-row site-search-row">
-      <label for="site-search">Site name</label>
-      <input id="site-search" placeholder="e.g. pornhub" autocomplete="off" />
-      <ul id="site-suggestions" class="site-suggestions" hidden></ul>
+    <div class="settings-section">
+      <h2>Add site login</h2>
+      <div class="form-row site-search-row">
+        <label for="site-search">Search supported sites</label>
+        <input
+          id="site-search"
+          type="search"
+          placeholder="Search yt-dlp supported sites…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <ul id="site-suggestions" class="site-suggestions" hidden></ul>
+      </div>
+      <p id="site-search-hint" class="meta">
+        Type a site name to search. When a supported site is found, login fields appear below.
+      </p>
+      <p id="site-search-empty" class="meta site-search-empty hidden">
+        No supported site matches that search. Try another name (e.g. youtube, pornhub, onlyfans).
+      </p>
+
+      <div id="add-login-form" class="add-login-form hidden">
+        <p class="meta add-login-form__site">
+          Site: <strong id="selected-site-label"></strong>
+        </p>
+
+        <div class="auth-mode-toggle">
+          <label>
+            <input type="radio" name="add-auth-mode" value="Credentials" checked />
+            Username &amp; password
+          </label>
+          <label>
+            <input type="radio" name="add-auth-mode" value="Cookies" />
+            Cookie text
+          </label>
+        </div>
+
+        <div id="add-credentials-panel">
+          <div class="form-row">
+            <label for="add-username">Username</label>
+            <input id="add-username" type="text" autocomplete="username" />
+          </div>
+          <div class="form-row">
+            <label for="add-password">Password</label>
+            <input
+              id="add-password"
+              type="password"
+              autocomplete="new-password"
+              placeholder="Password is hidden while typing"
+            />
+          </div>
+        </div>
+
+        <div id="add-cookies-panel" class="hidden">
+          <div class="form-row">
+            <label for="add-cookies">Cookies (Netscape format)</label>
+            <textarea
+              id="add-cookies"
+              class="cookie-textarea"
+              rows="10"
+              placeholder="# Netscape HTTP Cookie File&#10;# Paste exported cookies here…"
+              spellcheck="false"
+            ></textarea>
+            <p class="meta">Paste the full cookie file text. Lines wrap for easier editing.</p>
+          </div>
+        </div>
+
+        <button type="button" id="add-login-btn">Add login to downloader</button>
+      </div>
     </div>
-    <button type="button" id="add-site-btn">Add site</button>
+
+    <div class="settings-section">
+      <h2>Configured logins</h2>
+      <div id="configured-logins"></div>
+    </div>
   </div>
 
-  <div id="site-cards" class="site-cards"></div>
-
-  <script src="plugin-api.js"></script>
   <script>
-    const { api, escapeHtml, showMessage } = window.DownloadPluginUi;
-    const messageEl = document.getElementById('message');
+    document.addEventListener('DOMContentLoaded', function () {
+      var initPromise = window.CherryBoxPluginApi
+        ? CherryBoxPluginApi.initCherryBoxPlugin()
+        : Promise.resolve();
 
-    const KNOWN_SITES = [
-      'pornhub', 'xvideos', 'xhamster', 'onlyfans', 'fansly', 'youtube', 'vimeo',
-      'twitter', 'instagram', 'reddit', 'twitch', 'bilibili', 'spankbang', 'eporner',
-    ];
+      initPromise
+        .then(function () {
+          var ui = window.DownloadPluginUi;
+          if (!ui) throw new Error('Download plugin UI failed to load.');
 
-    const DEFAULT_TEST_URLS = {
-      pornhub: 'https://www.pornhub.com/',
-      xvideos: 'https://www.xvideos.com/',
-      xhamster: 'https://xhamster.com/',
-      onlyfans: 'https://onlyfans.com/',
-      fansly: 'https://fansly.com/',
-      youtube: 'https://www.youtube.com/feed/subscriptions',
-      vimeo: 'https://vimeo.com/',
-      twitter: 'https://x.com/',
-      instagram: 'https://www.instagram.com/',
-      reddit: 'https://www.reddit.com/',
-      twitch: 'https://www.twitch.tv/',
-      bilibili: 'https://www.bilibili.com/',
-    };
+          var api = ui.api;
+          var escapeHtml = ui.escapeHtml;
+          var showMessage = ui.showMessage;
 
-    let siteAuth = [];
-    const drafts = new Map();
+          var SUPPORTED_SITES = window.DownloadSupportedSites || [];
+          var messageEl = document.getElementById('message');
+          var siteAuth = [];
+          var selectedSite = null;
 
-    function normalizeSiteKey(value) {
-      return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    }
-
-    function getDraft(siteKey) {
-      if (!drafts.has(siteKey)) {
-        const saved = siteAuth.find((entry) => entry.siteKey === siteKey);
-        drafts.set(siteKey, {
-          authMode: saved?.authMode || 'Credentials',
-          username: saved?.username || '',
-          password: '',
-          testUrl: saved?.testUrl || DEFAULT_TEST_URLS[siteKey] || '',
-          hasPassword: saved?.hasPassword || false,
-          hasCookiesFile: saved?.hasCookiesFile || false,
-        });
-      }
-      return drafts.get(siteKey);
-    }
-
-    function renderSuggestions(query) {
-      const list = document.getElementById('site-suggestions');
-      const normalized = normalizeSiteKey(query);
-      if (!normalized) {
-        list.hidden = true;
-        list.innerHTML = '';
-        return;
-      }
-
-      const configured = new Set(siteAuth.map((entry) => entry.siteKey));
-      const matches = KNOWN_SITES
-        .filter((site) => site.includes(normalized) && !configured.has(site))
-        .slice(0, 8);
-
-      if (!matches.length) {
-        list.hidden = true;
-        list.innerHTML = '';
-        return;
-      }
-
-      list.innerHTML = matches.map((site) => `<li><button type="button" data-site="${site}">${site}</button></li>`).join('');
-      list.hidden = false;
-      list.querySelectorAll('button').forEach((button) => {
-        button.addEventListener('click', () => {
-          document.getElementById('site-search').value = button.getAttribute('data-site');
-          list.hidden = true;
-        });
-      });
-    }
-
-    function renderSiteCards() {
-      const container = document.getElementById('site-cards');
-      if (!siteAuth.length) {
-        container.innerHTML = '<p class="meta">No site logins configured yet. Search for a site above to get started.</p>';
-        return;
-      }
-
-      container.innerHTML = siteAuth.map((entry) => {
-        const draft = getDraft(entry.siteKey);
-        const credentialsActive = draft.authMode === 'Credentials';
-        return `
-          <section class="site-card" data-site="${escapeHtml(entry.siteKey)}">
-            <div class="site-card__header">
-              <h2>${escapeHtml(entry.siteKey)}</h2>
-              <button type="button" class="secondary danger" data-remove="${escapeHtml(entry.siteKey)}">Remove</button>
-            </div>
-
-            <div class="auth-mode-toggle">
-              <label><input type="radio" name="auth-mode-${escapeHtml(entry.siteKey)}" value="Credentials" ${credentialsActive ? 'checked' : ''} /> Username &amp; password</label>
-              <label><input type="radio" name="auth-mode-${escapeHtml(entry.siteKey)}" value="Cookies" ${!credentialsActive ? 'checked' : ''} /> Cookie file</label>
-            </div>
-
-            <div class="auth-panel ${credentialsActive ? '' : 'hidden'}" data-panel="credentials">
-              <div class="form-row">
-                <label>Username</label>
-                <input type="text" data-field="username" value="${escapeHtml(draft.username)}" autocomplete="username" />
-              </div>
-              <div class="form-row">
-                <label>Password</label>
-                <input type="password" data-field="password" placeholder="${draft.hasPassword ? 'Leave blank to keep saved password' : 'Password'}" autocomplete="current-password" />
-              </div>
-            </div>
-
-            <div class="auth-panel ${credentialsActive ? 'hidden' : ''}" data-panel="cookies">
-              <p class="meta">${draft.hasCookiesFile ? 'Cookie file uploaded.' : 'No cookie file uploaded yet.'}</p>
-              <div class="form-row">
-                <label>Cookie file (Netscape format)</label>
-                <input type="file" data-field="cookies" accept=".txt,text/plain" />
-              </div>
-            </div>
-
-            <div class="form-row">
-              <label>Test URL</label>
-              <input type="url" data-field="testUrl" value="${escapeHtml(draft.testUrl)}" placeholder="https://…" />
-              <p class="meta">A page on this site that requires login. yt-dlp uses <code>--simulate</code> to verify access.</p>
-            </div>
-
-            <div class="site-card__actions">
-              <button type="button" data-test="${escapeHtml(entry.siteKey)}">Test login</button>
-              <button type="button" class="secondary" data-save="${escapeHtml(entry.siteKey)}">Save</button>
-            </div>
-            <p class="meta test-result" data-test-result hidden></p>
-          </section>`;
-      }).join('');
-
-      container.querySelectorAll('.site-card').forEach((card) => {
-        const siteKey = card.getAttribute('data-site');
-        const draft = getDraft(siteKey);
-
-        card.querySelectorAll(`input[name="auth-mode-${siteKey}"]`).forEach((radio) => {
-          radio.addEventListener('change', () => {
-            draft.authMode = radio.value;
-            card.querySelector('[data-panel="credentials"]').classList.toggle('hidden', draft.authMode !== 'Credentials');
-            card.querySelector('[data-panel="cookies"]').classList.toggle('hidden', draft.authMode !== 'Cookies');
-          });
-        });
-
-        card.querySelector('[data-field="username"]').addEventListener('input', (event) => {
-          draft.username = event.target.value;
-        });
-        card.querySelector('[data-field="password"]').addEventListener('input', (event) => {
-          draft.password = event.target.value;
-        });
-        card.querySelector('[data-field="testUrl"]').addEventListener('input', (event) => {
-          draft.testUrl = event.target.value;
-        });
-        card.querySelector('[data-field="cookies"]')?.addEventListener('change', async (event) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          const resultEl = card.querySelector('[data-test-result]');
-          resultEl.hidden = true;
-          try {
-            const updated = await api.uploadSiteCookies(siteKey, file);
-            draft.hasCookiesFile = updated.hasCookiesFile;
-            draft.authMode = 'Cookies';
-            showMessage(messageEl, `Cookie file saved for ${siteKey}`);
-            await refreshSiteAuth();
-          } catch (err) {
-            showMessage(messageEl, err.message, true);
-          } finally {
-            event.target.value = '';
+          function normalizeSiteKey(value) {
+            return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
           }
-        });
 
-        card.querySelector('[data-save]').addEventListener('click', async () => {
-          const button = card.querySelector('[data-save]');
-          button.disabled = true;
-          try {
-            const payload = {
-              siteKey,
-              authMode: draft.authMode,
-              username: draft.username || null,
-              testUrl: draft.testUrl || null,
-            };
-            if (draft.password) payload.password = draft.password;
-            const updated = await api.upsertSiteAuth(payload);
-            draft.hasPassword = updated.hasPassword;
-            draft.hasCookiesFile = updated.hasCookiesFile;
-            draft.password = '';
-            showMessage(messageEl, `Saved login for ${siteKey}`);
-            await refreshSiteAuth();
-          } catch (err) {
-            showMessage(messageEl, err.message, true);
-          } finally {
-            button.disabled = false;
-          }
-        });
-
-        card.querySelector('[data-test]').addEventListener('click', async () => {
-          const button = card.querySelector('[data-test]');
-          const resultEl = card.querySelector('[data-test-result]');
-          button.disabled = true;
-          resultEl.hidden = true;
-          try {
-            const result = await api.testSiteAuth({
-              siteKey,
-              authMode: draft.authMode,
-              username: draft.username || null,
-              testUrl: draft.testUrl || null,
-              password: draft.password || null,
+          function findSupportedSite(siteKey) {
+            var normalized = normalizeSiteKey(siteKey);
+            if (!normalized) return null;
+            return SUPPORTED_SITES.find(function (site) {
+              return site.id === normalized;
             });
-            resultEl.textContent = result.message;
-            resultEl.className = result.success ? 'meta test-result success' : 'meta test-result error';
-            resultEl.hidden = false;
-          } catch (err) {
-            resultEl.textContent = err.message;
-            resultEl.className = 'meta test-result error';
-            resultEl.hidden = false;
-          } finally {
-            button.disabled = false;
           }
-        });
 
-        card.querySelector('[data-remove]').addEventListener('click', async () => {
-          if (!confirm(`Remove login settings for ${siteKey}?`)) return;
-          try {
-            await api.removeSiteAuth(siteKey);
-            drafts.delete(siteKey);
-            showMessage(messageEl, `Removed ${siteKey}`);
-            await refreshSiteAuth();
-          } catch (err) {
-            showMessage(messageEl, err.message, true);
+          function filterSupportedSites(query) {
+            var normalized = normalizeSiteKey(query);
+            if (!normalized) return [];
+            return SUPPORTED_SITES.filter(function (site) {
+              if (site.id.includes(normalized)) return true;
+              if (site.label.toLowerCase().includes(normalized)) return true;
+              return false;
+            }).slice(0, 12);
           }
+
+          function isConfigured(siteKey) {
+            return siteAuth.some(function (entry) {
+              return entry.siteKey === siteKey;
+            });
+          }
+
+          function setAuthMode(mode) {
+            var credentials = mode === 'Credentials';
+            document.getElementById('add-credentials-panel').classList.toggle('hidden', !credentials);
+            document.getElementById('add-cookies-panel').classList.toggle('hidden', credentials);
+          }
+
+          function clearAddForm() {
+            document.getElementById('add-username').value = '';
+            document.getElementById('add-password').value = '';
+            document.getElementById('add-cookies').value = '';
+            document.querySelector('input[name="add-auth-mode"][value="Credentials"]').checked = true;
+            setAuthMode('Credentials');
+          }
+
+          function hideAddForm() {
+            selectedSite = null;
+            document.getElementById('add-login-form').classList.add('hidden');
+          }
+
+          function selectSite(site) {
+            selectedSite = site;
+            document.getElementById('selected-site-label').textContent = site.label + ' (' + site.id + ')';
+            document.getElementById('add-login-form').classList.remove('hidden');
+            document.getElementById('site-search-empty').classList.add('hidden');
+            document.getElementById('site-search-hint').classList.add('hidden');
+            document.getElementById('site-suggestions').hidden = true;
+
+            clearAddForm();
+
+            var existing = siteAuth.find(function (entry) {
+              return entry.siteKey === site.id;
+            });
+            if (existing) {
+              if (existing.authMode === 'Cookies') {
+                document.querySelector('input[name="add-auth-mode"][value="Cookies"]').checked = true;
+                setAuthMode('Cookies');
+              }
+              if (existing.username) {
+                document.getElementById('add-username').value = existing.username;
+              }
+              if (existing.hasPassword) {
+                document.getElementById('add-password').placeholder = 'Leave blank to keep saved password';
+              }
+            }
+          }
+
+          function renderSuggestions(query) {
+            var list = document.getElementById('site-suggestions');
+            var emptyEl = document.getElementById('site-search-empty');
+            var hintEl = document.getElementById('site-search-hint');
+            var matches = filterSupportedSites(query);
+            var normalized = normalizeSiteKey(query);
+
+            if (!normalized) {
+              list.hidden = true;
+              list.innerHTML = '';
+              emptyEl.classList.add('hidden');
+              hintEl.classList.remove('hidden');
+              hideAddForm();
+              return;
+            }
+
+            if (!matches.length) {
+              list.hidden = true;
+              list.innerHTML = '';
+              emptyEl.classList.remove('hidden');
+              hintEl.classList.add('hidden');
+              hideAddForm();
+              return;
+            }
+
+            emptyEl.classList.add('hidden');
+            hintEl.classList.add('hidden');
+
+            list.innerHTML = matches
+              .map(function (site) {
+                var configured = isConfigured(site.id) ? ' · configured' : '';
+                return (
+                  '<li><button type="button" data-site-id="' +
+                  escapeHtml(site.id) +
+                  '">' +
+                  escapeHtml(site.label) +
+                  ' <span class="meta">(' +
+                  escapeHtml(site.id) +
+                  configured +
+                  ')</span></button></li>'
+                );
+              })
+              .join('');
+            list.hidden = false;
+
+            list.querySelectorAll('button').forEach(function (button) {
+              button.addEventListener('click', function () {
+                var site = findSupportedSite(button.getAttribute('data-site-id'));
+                if (!site) return;
+                document.getElementById('site-search').value = site.label;
+                selectSite(site);
+              });
+            });
+
+            var exact = findSupportedSite(normalized);
+            if (exact && matches.length === 1 && matches[0].id === exact.id) {
+              selectSite(exact);
+            }
+          }
+
+          function renderConfiguredLogins() {
+            var container = document.getElementById('configured-logins');
+            if (!siteAuth.length) {
+              container.innerHTML = '<p class="meta">No site logins configured yet.</p>';
+              return;
+            }
+
+            container.innerHTML =
+              '<ul class="settings-list">' +
+              siteAuth
+                .map(function (entry) {
+                  var site = findSupportedSite(entry.siteKey);
+                  var label = site ? site.label : entry.siteKey;
+                  var modeLabel =
+                    entry.authMode === 'Cookies'
+                      ? entry.hasCookiesFile
+                        ? 'Cookie text saved'
+                        : 'Cookie text (not uploaded yet)'
+                      : entry.hasPassword
+                        ? 'Username & password · password saved'
+                        : 'Username & password';
+                  return (
+                    '<li class="settings-list__row">' +
+                    '<div>' +
+                    '<strong>' +
+                    escapeHtml(label) +
+                    '</strong>' +
+                    '<p class="meta">' +
+                    escapeHtml(modeLabel) +
+                    (entry.username ? ' · ' + escapeHtml(entry.username) : '') +
+                    '</p>' +
+                    '</div>' +
+                    '<div class="configured-login__actions">' +
+                    '<button type="button" class="secondary" data-edit="' +
+                    escapeHtml(entry.siteKey) +
+                    '">Edit</button>' +
+                    '<button type="button" class="secondary danger" data-remove="' +
+                    escapeHtml(entry.siteKey) +
+                    '">Remove</button>' +
+                    '</div>' +
+                    '</li>'
+                  );
+                })
+                .join('') +
+              '</ul>';
+
+            container.querySelectorAll('[data-edit]').forEach(function (button) {
+              button.addEventListener('click', function () {
+                var site = findSupportedSite(button.getAttribute('data-edit'));
+                if (!site) {
+                  showMessage(messageEl, 'Site is configured but not in the supported list.', true);
+                  return;
+                }
+                document.getElementById('site-search').value = site.label;
+                selectSite(site);
+                document.getElementById('add-login-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              });
+            });
+
+            container.querySelectorAll('[data-remove]').forEach(function (button) {
+              button.addEventListener('click', async function () {
+                var siteKey = button.getAttribute('data-remove');
+                if (!confirm('Remove login for ' + siteKey + '?')) return;
+                try {
+                  await api.removeSiteAuth(siteKey);
+                  showMessage(messageEl, 'Removed ' + siteKey);
+                  await refreshSiteAuth();
+                  if (selectedSite && selectedSite.id === siteKey) {
+                    hideAddForm();
+                    document.getElementById('site-search').value = '';
+                    document.getElementById('site-search-hint').classList.remove('hidden');
+                  }
+                } catch (err) {
+                  showMessage(messageEl, err.message, true);
+                }
+              });
+            });
+          }
+
+          async function refreshSiteAuth() {
+            siteAuth = await api.listSiteAuth();
+            renderConfiguredLogins();
+          }
+
+          document.getElementById('site-search').addEventListener('input', function (event) {
+            renderSuggestions(event.target.value);
+          });
+
+          document.getElementById('site-search').addEventListener('focus', function (event) {
+            if (event.target.value.trim()) renderSuggestions(event.target.value);
+          });
+
+          document.querySelectorAll('input[name="add-auth-mode"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+              setAuthMode(radio.value);
+            });
+          });
+
+          document.getElementById('add-login-btn').addEventListener('click', async function () {
+            if (!selectedSite) {
+              showMessage(messageEl, 'Select a supported site from the search results first.', true);
+              return;
+            }
+
+            var button = document.getElementById('add-login-btn');
+            var authMode = document.querySelector('input[name="add-auth-mode"]:checked').value;
+            var username = document.getElementById('add-username').value.trim();
+            var password = document.getElementById('add-password').value;
+            var cookieText = document.getElementById('add-cookies').value.trim();
+            var existing = siteAuth.find(function (entry) {
+              return entry.siteKey === selectedSite.id;
+            });
+
+            button.disabled = true;
+            try {
+              if (authMode === 'Credentials') {
+                if (!username) {
+                  showMessage(messageEl, 'Username is required.', true);
+                  return;
+                }
+                if (!password && !existing?.hasPassword) {
+                  showMessage(messageEl, 'Password is required.', true);
+                  return;
+                }
+                await api.upsertSiteAuth({
+                  siteKey: selectedSite.id,
+                  authMode: 'Credentials',
+                  username: username,
+                  password: password || null,
+                  testUrl: selectedSite.testUrl || null,
+                });
+              } else {
+                if (!cookieText) {
+                  showMessage(messageEl, 'Paste cookie text before adding.', true);
+                  return;
+                }
+                await api.upsertSiteAuth({
+                  siteKey: selectedSite.id,
+                  authMode: 'Cookies',
+                  username: null,
+                  password: null,
+                  testUrl: selectedSite.testUrl || null,
+                });
+                await api.uploadSiteCookiesText(selectedSite.id, cookieText);
+              }
+
+              showMessage(messageEl, 'Login added to downloader for ' + selectedSite.label);
+              clearAddForm();
+              document.getElementById('site-search').value = '';
+              hideAddForm();
+              document.getElementById('site-search-hint').classList.remove('hidden');
+              await refreshSiteAuth();
+            } catch (err) {
+              showMessage(messageEl, err.message, true);
+            } finally {
+              button.disabled = false;
+            }
+          });
+
+          return refreshSiteAuth();
+        })
+        .catch(function (err) {
+          var messageEl = document.getElementById('message');
+          if (messageEl) {
+            messageEl.hidden = false;
+            messageEl.textContent = err.message || 'Failed to load site logins';
+            messageEl.className = 'plugin-message error';
+          }
+          console.error(err);
         });
-      });
-    }
-
-    async function refreshSiteAuth() {
-      siteAuth = await api.listSiteAuth();
-      renderSiteCards();
-    }
-
-    document.getElementById('site-search').addEventListener('input', (event) => {
-      renderSuggestions(event.target.value);
     });
-
-    document.getElementById('add-site-btn').addEventListener('click', async () => {
-      const input = document.getElementById('site-search');
-      const siteKey = normalizeSiteKey(input.value);
-      if (!siteKey) {
-        showMessage(messageEl, 'Enter a site name (e.g. pornhub).', true);
-        return;
-      }
-
-      if (siteAuth.some((entry) => entry.siteKey === siteKey)) {
-        showMessage(messageEl, `${siteKey} is already configured.`, true);
-        return;
-      }
-
-      try {
-        await api.upsertSiteAuth({
-          siteKey,
-          authMode: 'Credentials',
-          username: null,
-          password: null,
-          testUrl: DEFAULT_TEST_URLS[siteKey] || null,
-        });
-        drafts.delete(siteKey);
-        input.value = '';
-        document.getElementById('site-suggestions').hidden = true;
-        showMessage(messageEl, `Added ${siteKey}. Enter login details below.`);
-        await refreshSiteAuth();
-      } catch (err) {
-        showMessage(messageEl, err.message, true);
-      }
-    });
-
-    refreshSiteAuth().catch((err) => showMessage(messageEl, err.message, true));
   </script>
 </body>
 </html>

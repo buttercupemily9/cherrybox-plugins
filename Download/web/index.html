@@ -5,68 +5,221 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Downloads</title>
   <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="/skins/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
 </head>
 <body>
-  <h1>Downloads</h1>
-  <p class="meta">Queue new URLs from <strong>Settings → Queue</strong> (Download plugin tab).</p>
-  <div id="message" class="plugin-message" hidden></div>
-  <div id="list"></div>
-  <script src="plugin-api.js"></script>
+  <div class="card download-page">
+    <h1>Downloads</h1>
+    <p class="meta">Queue URLs for yt-dlp. Already-downloaded URLs are blocked using the download history database.</p>
+    <div id="message" class="plugin-message" hidden></div>
+
+    <div class="settings-section">
+      <h2>Queue download</h2>
+      <form id="queue-form">
+        <div class="form-row">
+          <label for="url">URL</label>
+          <input id="url" name="url" placeholder="https://…" required />
+        </div>
+        <div class="form-row">
+          <label for="folder">Target folder</label>
+          <select id="folder" name="folder">
+            <option value="">Default downloads folder</option>
+          </select>
+        </div>
+        <button type="submit" id="queue-btn">Queue download</button>
+      </form>
+    </div>
+
+    <div class="settings-section">
+      <h2>Queued &amp; recent downloads</h2>
+      <div id="list"></div>
+    </div>
+  </div>
   <script>
-    const { api, STATUS_LABEL, escapeHtml, showMessage } = window.DownloadPluginUi;
-    const messageEl = document.getElementById('message');
-    const listEl = document.getElementById('list');
-    let retryBusy = null;
+    document.addEventListener('DOMContentLoaded', function () {
+      var initPromise = window.CherryBoxPluginApi
+        ? CherryBoxPluginApi.initCherryBoxPlugin()
+        : Promise.resolve();
 
-    function canRetry(status) {
-      return status === 'Failed' || status === 'Cancelled' || status === 'Blocked';
-    }
+      initPromise
+        .then(function () {
+          var ui = window.DownloadPluginUi;
+          if (!ui) throw new Error('Download plugin UI failed to load.');
 
-    function render(downloads) {
-      if (!downloads.length) {
-        listEl.innerHTML = '<p class="meta">No downloads yet.</p>';
-        return;
-      }
+          var api = ui.api;
+          var STATUS_LABEL = ui.STATUS_LABEL;
+          var formatTime = ui.formatTime;
+          var escapeHtml = ui.escapeHtml;
+          var showMessage = ui.showMessage;
 
-      listEl.innerHTML = `<ul class="download-list">${downloads.map((d) => `
-        <li class="download-row">
-          <div class="download-row__info">
-            <div class="download-row__header">
-              <span class="status">${escapeHtml(STATUS_LABEL[d.status] ?? d.status)}</span>
-              <a class="download-row__url" href="${escapeHtml(d.url)}" target="_blank" rel="noreferrer">${escapeHtml(d.url)}</a>
-            </div>
-            ${d.outputPath ? `<p class="meta">Saved to ${escapeHtml(d.outputPath)}</p>` : ''}
-            ${(d.blockReason || d.errorMessage) ? `<p class="error">${escapeHtml(d.blockReason ?? d.errorMessage)}</p>` : ''}
-            ${d.existingMediaTitle ? `<p class="meta">Already in library: ${escapeHtml(d.existingMediaTitle)}</p>` : ''}
-          </div>
-          ${canRetry(d.status) ? `<button type="button" data-retry="${d.id}" ${retryBusy ? 'disabled' : ''}>${retryBusy === d.id ? 'Retrying…' : 'Retry'}</button>` : ''}
-        </li>`).join('')}</ul>`;
+          var messageEl = document.getElementById('message');
+          var listEl = document.getElementById('list');
+          var retryBusy = null;
+          var cancelBusy = null;
 
-      listEl.querySelectorAll('[data-retry]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          const id = button.getAttribute('data-retry');
-          retryBusy = id;
-          render(downloads);
-          try {
-            await api.retryDownload(id);
-            showMessage(messageEl, 'Download re-queued');
-            await refresh();
-          } catch (err) {
-            showMessage(messageEl, err.message, true);
-          } finally {
-            retryBusy = null;
+          function canRetry(status) {
+            return status === 'Failed' || status === 'Cancelled' || status === 'Blocked';
           }
+
+          function canCancel(status) {
+            return status === 'Pending' || status === 'Running';
+          }
+
+          function render(downloads) {
+            if (!downloads.length) {
+              listEl.innerHTML = '<p class="meta">No downloads yet.</p>';
+              return;
+            }
+
+            listEl.innerHTML =
+              '<ul class="download-list">' +
+              downloads
+                .map(function (d) {
+                  return (
+                    '<li class="download-row">' +
+                    '<div class="download-row__info">' +
+                    '<div class="download-row__header">' +
+                    '<span class="status">' +
+                    escapeHtml(STATUS_LABEL[d.status] ?? d.status) +
+                    '</span>' +
+                    '<a class="download-row__url" href="' +
+                    escapeHtml(d.url) +
+                    '" target="_blank" rel="noreferrer">' +
+                    escapeHtml(d.url) +
+                    '</a>' +
+                    '</div>' +
+                    (d.outputPath
+                      ? '<p class="meta">Saved to ' + escapeHtml(d.outputPath) + '</p>'
+                      : '') +
+                    (d.blockReason || d.errorMessage
+                      ? '<p class="error">' +
+                        escapeHtml(d.blockReason ?? d.errorMessage) +
+                        '</p>'
+                      : '') +
+                    (d.existingMediaTitle
+                      ? '<p class="meta">Already in library: ' +
+                        escapeHtml(d.existingMediaTitle) +
+                        '</p>'
+                      : '') +
+                    (d.retryAfterAt && d.status === 'Failed'
+                      ? '<p class="meta">Auto-retry after ' + formatTime(d.retryAfterAt) + '</p>'
+                      : '') +
+                    '</div>' +
+                    '<div class="download-row__actions">' +
+                    (canRetry(d.status)
+                      ? '<button type="button" class="secondary" data-retry="' +
+                        d.id +
+                        '" ' +
+                        (retryBusy ? 'disabled' : '') +
+                        '>' +
+                        (retryBusy === d.id ? 'Retrying…' : 'Retry') +
+                        '</button>'
+                      : '') +
+                    (canCancel(d.status)
+                      ? '<button type="button" class="secondary" data-cancel="' +
+                        d.id +
+                        '" ' +
+                        (cancelBusy ? 'disabled' : '') +
+                        '>' +
+                        (cancelBusy === d.id ? 'Cancelling…' : 'Cancel') +
+                        '</button>'
+                      : '') +
+                    '</div>' +
+                    '</li>'
+                  );
+                })
+                .join('') +
+              '</ul>';
+
+            listEl.querySelectorAll('[data-retry]').forEach(function (button) {
+              button.addEventListener('click', async function () {
+                var id = button.getAttribute('data-retry');
+                retryBusy = id;
+                render(downloads);
+                try {
+                  await api.retryDownload(id);
+                  showMessage(messageEl, 'Download re-queued');
+                  await refresh();
+                } catch (err) {
+                  showMessage(messageEl, err.message, true);
+                } finally {
+                  retryBusy = null;
+                }
+              });
+            });
+
+            listEl.querySelectorAll('[data-cancel]').forEach(function (button) {
+              button.addEventListener('click', async function () {
+                var id = button.getAttribute('data-cancel');
+                cancelBusy = id;
+                render(downloads);
+                try {
+                  await api.cancelDownload(id);
+                  showMessage(messageEl, 'Download cancelled');
+                  await refresh();
+                } catch (err) {
+                  showMessage(messageEl, err.message, true);
+                } finally {
+                  cancelBusy = null;
+                }
+              });
+            });
+          }
+
+          async function refresh() {
+            render(await api.listDownloads());
+          }
+
+          async function loadFolders() {
+            var folders = await api.listFolders();
+            var select = document.getElementById('folder');
+            folders.forEach(function (folder) {
+              var option = document.createElement('option');
+              option.value = folder.id;
+              option.textContent = folder.displayName;
+              select.appendChild(option);
+            });
+          }
+
+          document.getElementById('queue-form').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            var button = document.getElementById('queue-btn');
+            button.disabled = true;
+            try {
+              var url = document.getElementById('url').value.trim();
+              var folderId = document.getElementById('folder').value || undefined;
+              var result = await api.enqueueDownload(url, folderId);
+              if (!result.accepted) {
+                showMessage(messageEl, result.blockReason ?? 'Download blocked', true);
+              } else {
+                showMessage(messageEl, 'Download queued');
+                document.getElementById('url').value = '';
+              }
+              await refresh();
+            } catch (err) {
+              showMessage(messageEl, err.message, true);
+            } finally {
+              button.disabled = false;
+            }
+          });
+
+          setInterval(function () {
+            refresh().catch(function () {});
+          }, 4000);
+
+          return Promise.all([loadFolders(), refresh()]);
+        })
+        .catch(function (err) {
+          var messageEl = document.getElementById('message');
+          if (messageEl) {
+            messageEl.hidden = false;
+            messageEl.textContent = err.message || 'Failed to load downloads';
+            messageEl.className = 'plugin-message error';
+          }
+          console.error(err);
         });
-      });
-    }
-
-    async function refresh() {
-      const downloads = await api.listDownloads();
-      render(downloads);
-    }
-
-    refresh().catch((err) => showMessage(messageEl, err.message, true));
-    setInterval(() => refresh().catch(() => undefined), 4000);
+    });
   </script>
 </body>
 </html>

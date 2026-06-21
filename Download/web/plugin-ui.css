@@ -1,30 +1,25 @@
-:root {
-  color-scheme: light;
-  font-family: system-ui, sans-serif;
-  --pink: #d63384;
-  --text: #4a2030;
-  --muted: #7a4a5c;
-  --border: #f3c9d9;
-  --bg: #fff5f8;
-  --error: #b42318;
+/* Download plugin layout — colors from /skins/stock-plugin.css (CherryBox skin tokens). */
+
+.download-page h1,
+.download-page h2,
+.download-page h3 {
+  color: var(--pink-dark);
+  margin-top: 0;
 }
 
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  padding: 1.25rem;
-  background: var(--bg);
-  color: var(--text);
+.download-page h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
-h1, h2, h3 { color: var(--pink); margin-top: 0; }
+.download-page code {
+  font-size: 0.9em;
+}
 
-.meta { color: var(--muted); font-size: 0.92rem; }
-
-.error { color: var(--error); }
-
-.plugin-message { margin-top: 1rem; }
+.plugin-message {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
 
 .download-list {
   list-style: none;
@@ -41,8 +36,14 @@ h1, h2, h3 { color: var(--pink); margin-top: 0; }
   align-items: flex-start;
   padding: 0.85rem 1rem;
   border-radius: 12px;
-  background: #fff;
-  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--pink-light) 55%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.download-row__info {
+  flex: 1;
+  min-width: 0;
 }
 
 .download-row__header {
@@ -54,7 +55,13 @@ h1, h2, h3 { color: var(--pink); margin-top: 0; }
 
 .download-row__url {
   word-break: break-all;
-  color: var(--pink);
+}
+
+.download-row__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .status {
@@ -62,43 +69,7 @@ h1, h2, h3 { color: var(--pink); margin-top: 0; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-}
-
-.form-row {
-  display: grid;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
-}
-
-input, select, button {
-  font: inherit;
-}
-
-input, select {
-  padding: 0.55rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #fff;
-}
-
-button {
-  padding: 0.55rem 1rem;
-  border-radius: 999px;
-  border: none;
-  background: var(--pink);
-  color: #fff;
-  cursor: pointer;
-}
-
-button.secondary {
-  background: #fff;
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  color: var(--pink-dark);
 }
 
 .settings-list {
@@ -110,10 +81,19 @@ button:disabled {
 }
 
 .settings-list__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 12px;
-  background: #fff;
-  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--pink-light) 55%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.settings-list__row strong {
+  color: var(--text-main);
 }
 
 .settings-section {
@@ -124,6 +104,10 @@ button:disabled {
   margin-bottom: 0;
 }
 
+.settings-section > button {
+  margin-top: 0.25rem;
+}
+
 .site-search-row {
   position: relative;
 }
@@ -132,26 +116,29 @@ button:disabled {
   list-style: none;
   margin: 0.25rem 0 0;
   padding: 0.25rem;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--pink-light) 55%, transparent);
   border-radius: 8px;
-  background: #fff;
+  background: var(--card-bg);
   position: absolute;
   left: 0;
   right: 0;
   z-index: 2;
+  box-shadow: var(--shadow);
 }
 
 .site-suggestions button {
   width: 100%;
   text-align: left;
   background: transparent;
-  color: var(--text);
+  color: var(--text-main);
   border-radius: 6px;
   padding: 0.45rem 0.6rem;
+  border: none;
+  box-shadow: none;
 }
 
 .site-suggestions button:hover {
-  background: var(--bg);
+  background: color-mix(in srgb, var(--pink-soft) 65%, transparent);
 }
 
 .site-cards {
@@ -162,8 +149,9 @@ button:disabled {
 .site-card {
   padding: 1rem 1.1rem;
   border-radius: 12px;
-  background: #fff;
-  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--pink-light) 55%, transparent);
+  box-shadow: var(--shadow);
 }
 
 .site-card__header {
@@ -184,6 +172,7 @@ button:disabled {
   flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 0.85rem;
+  color: var(--text-main);
 }
 
 .auth-panel.hidden {
@@ -198,8 +187,8 @@ button:disabled {
 }
 
 button.danger {
-  color: var(--error);
-  border-color: #f3c9c9;
+  color: #c0392b;
+  border-color: color-mix(in srgb, #c0392b 35%, transparent);
 }
 
 .test-result.success {
@@ -208,4 +197,36 @@ button.danger {
 
 .hidden {
   display: none !important;
+}
+
+.add-login-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--pink-light) 45%, transparent);
+}
+
+.add-login-form__site {
+  margin-bottom: 0.75rem;
+}
+
+.cookie-textarea {
+  width: 100%;
+  min-height: 9rem;
+  resize: vertical;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.site-search-empty {
+  margin-top: 0.5rem;
+}
+
+.configured-login__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }

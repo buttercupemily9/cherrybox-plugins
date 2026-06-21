@@ -63,6 +63,22 @@ public interface IMetadataProvider
     Task<object?> LookupAsync(string url, CancellationToken cancellationToken = default);
 }
 
+public sealed class PluginSkinDefinition
+{
+    public required string Id { get; set; }
+    public required string Label { get; set; }
+    /// <summary>CSS file under the plugin web/ folder.</summary>
+    public string? Stylesheet { get; set; }
+}
+
+public sealed class PluginSkinsManifest
+{
+    /// <summary>Per core skin override stylesheets (keys: girl, boy, trans, pride).</summary>
+    public Dictionary<string, string>? Overrides { get; set; }
+    /// <summary>Plugin-only skins selectable inside the plugin UI (not in Account skin picker).</summary>
+    public List<PluginSkinDefinition>? PluginSkins { get; set; }
+}
+
 public sealed class PluginManifest
 {
     public required string Id { get; set; }
@@ -72,4 +88,5 @@ public sealed class PluginManifest
     public required string EntryType { get; set; }
     public List<PluginUiTabDefinition>? MainTabs { get; set; }
     public List<PluginUiTabDefinition>? SettingsTabs { get; set; }
+    public PluginSkinsManifest? Skins { get; set; }
 }

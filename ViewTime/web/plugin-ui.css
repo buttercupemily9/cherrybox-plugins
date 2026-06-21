@@ -1,24 +1,22 @@
-/* Backup plugin layout — colors come from /skins/stock-plugin.css (CherryBox skin tokens). */
-
-.backup-page h1,
-.backup-page h2,
-.backup-page h3 {
+.view-time-page h1,
+.view-time-page h2,
+.view-time-page h3 {
   color: var(--pink-dark);
   margin-top: 0;
 }
 
-.backup-page h2 {
+.view-time-page h2 {
   font-size: 1.1rem;
   margin-bottom: 0.5rem;
-}
-
-.backup-page code {
-  font-size: 0.9em;
 }
 
 .plugin-message {
   margin-top: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+.settings-section {
+  margin-bottom: 1.5rem;
 }
 
 .settings-list {
@@ -41,34 +39,35 @@
   box-shadow: var(--shadow);
 }
 
+.settings-list__row--stacked {
+  flex-direction: column;
+}
+
 .settings-list__row strong {
   color: var(--text-main);
 }
 
-.settings-actions {
+.settings-actions,
+.accounts-resolve,
+.user-edit-actions {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
   flex-shrink: 0;
 }
 
-.settings-section {
-  margin-bottom: 1.5rem;
+.accounts-resolve input,
+.user-edit-grid input,
+.user-edit-grid select {
+  min-width: 8rem;
 }
 
-.settings-section:last-child {
-  margin-bottom: 0;
+.user-edit-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
-.settings-section > button {
-  margin-top: 0.25rem;
-}
-
-.settings-actions button.secondary.danger {
-  border-color: color-mix(in srgb, #c62828 45%, var(--pink-light));
-  color: #c62828;
-}
-
-.settings-actions button.secondary.danger:hover:not(:disabled) {
-  background: color-mix(in srgb, #c62828 12%, var(--card-bg));
+.status--failed {
+  color: #c0392b;
 }

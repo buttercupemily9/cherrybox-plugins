@@ -60,6 +60,18 @@
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
       "changelog": "Initial release with SMTP settings and reset token emails."
+    },
+    {
+      "id": "view-time",
+      "folder": "ViewTime",
+      "name": "View time limits",
+      "version": "1.0.0",
+      "description": "Limit viewing minutes, account expiry, auto-replenishment, and minute requests.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ViewTime",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/ViewTime/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Move account advanced time management into a plugin settings tab."
     }
   ]
 }

@@ -1,0 +1,9 @@
+.card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(239, 246, 255, 0.9));
+}
+
+.card h1,
+.card h2 {
+  text-transform: uppercase;
+  font-size: 0.95rem;
+}
