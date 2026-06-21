@@ -21,5 +21,18 @@
       "page": "settings.html",
       "order": 100
     }
-  ]
+  ],
+  "skins": {
+    "overrides": {
+      "girl": "skins/girl-overrides.css",
+      "boy": "skins/boy-overrides.css"
+    },
+    "pluginSkins": [
+      {
+        "id": "night",
+        "label": "Night",
+        "stylesheet": "skins/night.css"
+      }
+    ]
+  }
 }

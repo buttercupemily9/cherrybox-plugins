@@ -21,6 +21,34 @@ jobs:
       - name: Checkout cherrybox-plugins
         uses: actions/checkout@v4
 
+      - name: Verify cherrybox access token
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.CHERRYBOX_REPO_TOKEN }}" ]; then
+            echo "::error::Repository secret CHERRYBOX_REPO_TOKEN is not set."
+            echo "Create a fine-grained GitHub PAT with read access to buttercupemily9/cherrybox,"
+            echo "then add it as a secret named CHERRYBOX_REPO_TOKEN on this repository."
+            echo "See plugins/docs/ci-setup.md for details."
+            exit 1
+          fi
+
+      - name: Checkout cherrybox (plugin build dependencies)
+        uses: actions/checkout@v4
+        with:
+          repository: buttercupemily9/cherrybox
+          ref: dev
+          path: _cherrybox
+          token: ${{ secrets.CHERRYBOX_REPO_TOKEN }}
+
+      - name: Verify cherrybox checkout
+        shell: bash
+        run: |
+          if [ ! -f _cherrybox/src/CherryBox.Core/CherryBox.Core.csproj ]; then
+            echo "::error::cherrybox checkout did not produce expected sources."
+            echo "Confirm CHERRYBOX_REPO_TOKEN has read access to buttercupemily9/cherrybox on branch dev."
+            exit 1
+          fi
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:

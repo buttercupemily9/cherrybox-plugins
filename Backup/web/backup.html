@@ -1,216 +1,300 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Backup</title>
-  <link rel="stylesheet" href="plugin-ui.css" />
-</head>
-<body>
-  <h1>Backup &amp; restore</h1>
-  <p class="meta">
-    Archives <code>config.json</code>, the main database, download history, and support-app metadata
-    into a hashed <code>.box</code> zip file. Configure automatic backups on the Tasks tab
-    (&quot;Create backup&quot;).
-  </p>
-  <div id="message" class="plugin-message" hidden></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Backup</title>
+    <link rel="stylesheet" href="plugin-ui.css" />
+    <script src="/skins/cherrybox-plugin-api.js" defer></script>
+    <script src="plugin-api.js" defer></script>
+  </head>
+  <body>
+    <div class="card backup-page">
+      <h1>Backup &amp; restore</h1>
+      <p class="meta">
+        Archives <code>config.json</code>, the main database, download history, and support-app metadata
+        into a hashed <code>.box</code> zip file. Backup files are stored inside the Backup plugin folder by default.
+        Configure the folder below or schedule automatic backups on the Tasks tab (&quot;Create backup&quot;).
+      </p>
+      <div id="message" class="plugin-message" hidden></div>
 
-  <div class="settings-section">
-    <h2>Create backup</h2>
-    <button type="button" id="create-btn">Create backup now</button>
-  </div>
-
-  <div class="settings-section">
-    <h2>Stored backups</h2>
-    <div id="backups"></div>
-  </div>
-
-  <div class="settings-section">
-    <h2>Restore from file</h2>
-    <p class="meta">Upload a <code>.box</code> backup created on this or another CherryBox server.</p>
-    <div class="form-row">
-      <label for="restore-file">Backup file</label>
-      <input id="restore-file" type="file" accept=".box,application/zip,application/octet-stream" />
-    </div>
-    <p class="meta" id="restore-status" hidden></p>
-  </div>
-
-  <div class="settings-section">
-    <h2>Backup settings</h2>
-    <form id="settings-form">
-      <div class="form-row">
-        <label for="max-stored">Max stored backups</label>
-        <input id="max-stored" type="number" min="1" max="500" value="30" />
+      <div class="settings-section">
+        <h2>Create backup</h2>
+        <button type="button" id="create-btn">Create backup now</button>
       </div>
-      <p class="meta" id="storage-folder"></p>
-      <button type="submit" id="settings-btn">Save backup settings</button>
-    </form>
-  </div>
 
-  <script src="plugin-api.js"></script>
-  <script>
-    const { api, formatTime, formatBytes, escapeHtml, showMessage } = window.BackupPluginUi;
-    const messageEl = document.getElementById('message');
-    let actionBusy = null;
+      <div class="settings-section">
+        <h2>Stored backups</h2>
+        <div id="backups"></div>
+      </div>
 
-    function renderBackups(backups) {
-      const el = document.getElementById('backups');
-      if (!backups.length) {
-        el.innerHTML = '<p class="meta">No backups yet.</p>';
-        return;
-      }
+      <div class="settings-section">
+        <h2>Restore from file</h2>
+        <p class="meta">Upload a <code>.box</code> backup created on this or another CherryBox server.</p>
+        <div class="form-row">
+          <label for="restore-file">Backup file</label>
+          <input id="restore-file" type="file" accept=".box,application/zip,application/octet-stream" />
+        </div>
+        <p class="meta" id="restore-status" hidden></p>
+      </div>
 
-      el.innerHTML = `<ul class="settings-list">${backups.map((backup) => `
-        <li class="settings-list__row">
-          <div>
-            <strong>${escapeHtml(backup.fileName)}</strong>
-            <p class="meta">
-              ${formatTime(backup.createdAt)}
-              · v${escapeHtml(backup.appVersion)}
-              · ${formatBytes(backup.sizeBytes)}
-            </p>
-            <p class="meta" title="${escapeHtml(backup.archiveSha256)}">
-              SHA-256: ${escapeHtml(backup.archiveSha256.slice(0, 16))}…
-            </p>
+      <div class="settings-section">
+        <h2>Backup settings</h2>
+        <form id="settings-form">
+          <div class="form-row">
+            <label for="backups-directory">Backup folder</label>
+            <input
+              id="backups-directory"
+              name="backupsDirectory"
+              placeholder="plugins/backup/backups"
+              required
+            />
+            <p class="meta" id="storage-folder"></p>
           </div>
-          <div class="settings-actions">
-            <button type="button" class="secondary" data-download="${backup.id}" data-name="${escapeHtml(backup.fileName)}">
-              ${actionBusy === backup.id ? '…' : 'Download'}
-            </button>
-            <button type="button" class="secondary" data-restore="${backup.id}" data-name="${escapeHtml(backup.fileName)}">
-              Restore
-            </button>
-            <button type="button" class="secondary" data-delete="${backup.id}" data-name="${escapeHtml(backup.fileName)}">
-              Delete
-            </button>
+          <div class="form-row">
+            <label for="max-stored">Max stored backups</label>
+            <input id="max-stored" type="number" min="1" max="500" value="30" />
           </div>
-        </li>`).join('')}</ul>`;
+          <button type="submit" id="settings-btn">Save backup settings</button>
+        </form>
+      </div>
+    </div>
 
-      el.querySelectorAll('[data-download]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          actionBusy = button.getAttribute('data-download');
-          renderBackups(backups);
-          try {
-            await api.downloadBackup(actionBusy, button.getAttribute('data-name'));
-            showMessage(messageEl, `Downloaded ${button.getAttribute('data-name')}`);
-          } catch (err) {
-            showMessage(messageEl, err.message, true);
-          } finally {
-            actionBusy = null;
-            await refresh();
-          }
-        });
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var initPromise = window.CherryBoxPluginApi
+          ? CherryBoxPluginApi.initCherryBoxPlugin()
+          : Promise.resolve();
+
+        initPromise
+          .then(function () {
+            var ui = window.BackupPluginUi;
+            if (!ui) throw new Error('Backup plugin UI failed to load.');
+
+            var api = ui.api;
+            var formatTime = ui.formatTime;
+            var formatBytes = ui.formatBytes;
+            var escapeHtml = ui.escapeHtml;
+            var showMessage = ui.showMessage;
+
+            var messageEl = document.getElementById('message');
+            var actionBusy = null;
+
+            function renderBackups(backups) {
+              var el = document.getElementById('backups');
+              if (!backups.length) {
+                el.innerHTML = '<p class="meta">No backups yet.</p>';
+                return;
+              }
+
+              el.innerHTML =
+                '<ul class="settings-list">' +
+                backups
+                  .map(function (backup) {
+                    return (
+                      '<li class="settings-list__row">' +
+                      '<div>' +
+                      '<strong>' +
+                      escapeHtml(backup.fileName) +
+                      '</strong>' +
+                      '<p class="meta">' +
+                      formatTime(backup.createdAt) +
+                      ' · v' +
+                      escapeHtml(backup.appVersion) +
+                      ' · ' +
+                      formatBytes(backup.sizeBytes) +
+                      '</p>' +
+                      '<p class="meta" title="' +
+                      escapeHtml(backup.archiveSha256) +
+                      '">SHA-256: ' +
+                      escapeHtml(backup.archiveSha256.slice(0, 16)) +
+                      '…</p>' +
+                      '</div>' +
+                      '<div class="settings-actions">' +
+                      '<button type="button" class="secondary" data-download="' +
+                      backup.id +
+                      '" data-name="' +
+                      escapeHtml(backup.fileName) +
+                      '">' +
+                      (actionBusy === 'download:' + backup.id ? '…' : 'Download') +
+                      '</button>' +
+                      '<button type="button" class="secondary" data-restore="' +
+                      backup.id +
+                      '" data-name="' +
+                      escapeHtml(backup.fileName) +
+                      '">' +
+                      (actionBusy === 'restore:' + backup.id ? 'Restoring…' : 'Restore') +
+                      '</button>' +
+                      '<button type="button" class="secondary danger" data-delete="' +
+                      backup.id +
+                      '" data-name="' +
+                      escapeHtml(backup.fileName) +
+                      '">' +
+                      (actionBusy === 'delete:' + backup.id ? 'Deleting…' : 'Delete') +
+                      '</button>' +
+                      '</div>' +
+                      '</li>'
+                    );
+                  })
+                  .join('') +
+                '</ul>';
+
+              el.querySelectorAll('[data-download]').forEach(function (button) {
+                button.addEventListener('click', async function () {
+                  var backupId = button.getAttribute('data-download');
+                  actionBusy = 'download:' + backupId;
+                  renderBackups(backups);
+                  try {
+                    await api.downloadBackup(backupId, button.getAttribute('data-name'));
+                    showMessage(messageEl, 'Downloaded ' + button.getAttribute('data-name'));
+                  } catch (err) {
+                    showMessage(messageEl, err.message, true);
+                  } finally {
+                    actionBusy = null;
+                    await refresh();
+                  }
+                });
+              });
+
+              el.querySelectorAll('[data-restore]').forEach(function (button) {
+                button.addEventListener('click', async function () {
+                  var name = button.getAttribute('data-name');
+                  var backupId = button.getAttribute('data-restore');
+                  if (!window.confirm('Restore settings and databases from ' + name + '? This replaces current data.'))
+                    return;
+
+                  actionBusy = 'restore:' + backupId;
+                  renderBackups(backups);
+                  try {
+                    var result = await api.restoreBackup(backupId);
+                    showMessage(messageEl, result.message ?? 'Restore completed');
+                    if (result.restartRecommended)
+                      showMessage(
+                        messageEl,
+                        (result.message ?? 'Restore completed') +
+                          ' Restart CherryBox to finish applying changes.'
+                      );
+                  } catch (err) {
+                    showMessage(messageEl, err.message, true);
+                  } finally {
+                    actionBusy = null;
+                    await refresh();
+                  }
+                });
+              });
+
+              el.querySelectorAll('[data-delete]').forEach(function (button) {
+                button.addEventListener('click', async function () {
+                  var name = button.getAttribute('data-name');
+                  var backupId = button.getAttribute('data-delete');
+                  if (
+                    !window.confirm(
+                      'Delete backup ' +
+                        name +
+                        ' from disk?\n\nThis removes the .box file permanently and cannot be undone.'
+                    )
+                  )
+                    return;
+
+                  actionBusy = 'delete:' + backupId;
+                  renderBackups(backups);
+                  try {
+                    await api.deleteBackup(backupId);
+                    showMessage(messageEl, 'Deleted ' + name);
+                  } catch (err) {
+                    showMessage(messageEl, err.message, true);
+                  } finally {
+                    actionBusy = null;
+                    await refresh();
+                  }
+                });
+              });
+            }
+
+            async function refresh() {
+              var results = await Promise.all([api.listBackups(), api.getBackupSettings()]);
+              var backups = results[0];
+              var settings = results[1];
+              renderBackups(backups);
+              document.getElementById('max-stored').value = settings.maxStoredBackups;
+              document.getElementById('backups-directory').value = settings.backupsDirectory;
+              document.getElementById('storage-folder').textContent =
+                'Resolved path: ' + settings.resolvedBackupsPath;
+            }
+
+            document.getElementById('create-btn').addEventListener('click', async function () {
+              var button = document.getElementById('create-btn');
+              button.disabled = true;
+              try {
+                var info = await api.createBackup();
+                showMessage(messageEl, 'Created backup ' + info.fileName);
+                await refresh();
+              } catch (err) {
+                showMessage(messageEl, err.message, true);
+              } finally {
+                button.disabled = false;
+              }
+            });
+
+            document.getElementById('settings-form').addEventListener('submit', async function (event) {
+              event.preventDefault();
+              var button = document.getElementById('settings-btn');
+              button.disabled = true;
+              try {
+                await api.updateBackupSettings({
+                  backupsDirectory: document.getElementById('backups-directory').value.trim(),
+                  maxStoredBackups: Math.max(
+                    1,
+                    Number(document.getElementById('max-stored').value) || 1
+                  ),
+                });
+                showMessage(messageEl, 'Backup settings saved');
+                await refresh();
+              } catch (err) {
+                showMessage(messageEl, err.message, true);
+              } finally {
+                button.disabled = false;
+              }
+            });
+
+            document.getElementById('restore-file').addEventListener('change', async function (event) {
+              var input = event.currentTarget;
+              var file = input.files && input.files[0];
+              input.value = '';
+              if (!file) return;
+
+              var statusEl = document.getElementById('restore-status');
+              statusEl.hidden = false;
+              statusEl.textContent = 'Restoring…';
+              try {
+                var result = await api.restoreBackupUpload(file);
+                showMessage(messageEl, result.message ?? 'Restore completed');
+                if (result.restartRecommended)
+                  showMessage(
+                    messageEl,
+                    (result.message ?? 'Restore completed') +
+                      ' Restart CherryBox to finish applying changes.'
+                  );
+                await refresh();
+              } catch (err) {
+                showMessage(messageEl, err.message, true);
+              } finally {
+                statusEl.hidden = true;
+              }
+            });
+
+            return refresh();
+          })
+          .catch(function (err) {
+            var messageEl = document.getElementById('message');
+            if (messageEl) {
+              messageEl.hidden = false;
+              messageEl.textContent = err.message || 'Failed to load backup UI';
+              messageEl.className = 'plugin-message error';
+            }
+            console.error(err);
+          });
       });
-
-      el.querySelectorAll('[data-restore]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          const name = button.getAttribute('data-name');
-          if (!window.confirm(`Restore settings and databases from ${name}? This replaces current data.`))
-            return;
-
-          actionBusy = button.getAttribute('data-restore');
-          renderBackups(backups);
-          try {
-            const result = await api.restoreBackup(actionBusy);
-            showMessage(messageEl, result.message ?? 'Restore completed');
-            if (result.restartRecommended)
-              showMessage(messageEl, `${result.message ?? 'Restore completed'} Restart CherryBox to finish applying changes.`);
-          } catch (err) {
-            showMessage(messageEl, err.message, true);
-          } finally {
-            actionBusy = null;
-            await refresh();
-          }
-        });
-      });
-
-      el.querySelectorAll('[data-delete]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          const name = button.getAttribute('data-name');
-          if (!window.confirm(`Delete backup ${name}?`))
-            return;
-
-          actionBusy = button.getAttribute('data-delete');
-          renderBackups(backups);
-          try {
-            await api.deleteBackup(actionBusy);
-            showMessage(messageEl, `Deleted ${name}`);
-          } catch (err) {
-            showMessage(messageEl, err.message, true);
-          } finally {
-            actionBusy = null;
-            await refresh();
-          }
-        });
-      });
-    }
-
-    async function refresh() {
-      const [backups, settings] = await Promise.all([
-        api.listBackups(),
-        api.getBackupSettings(),
-      ]);
-      renderBackups(backups);
-      document.getElementById('max-stored').value = settings.maxStoredBackups;
-      document.getElementById('storage-folder').textContent =
-        `Storage folder: %ProgramData%\\CherryBox\\${settings.backupsDirectory}`;
-    }
-
-    document.getElementById('create-btn').addEventListener('click', async () => {
-      const button = document.getElementById('create-btn');
-      button.disabled = true;
-      try {
-        const info = await api.createBackup();
-        showMessage(messageEl, `Created backup ${info.fileName}`);
-        await refresh();
-      } catch (err) {
-        showMessage(messageEl, err.message, true);
-      } finally {
-        button.disabled = false;
-      }
-    });
-
-    document.getElementById('settings-form').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const button = document.getElementById('settings-btn');
-      button.disabled = true;
-      try {
-        await api.updateBackupSettings({
-          maxStoredBackups: Math.max(1, Number(document.getElementById('max-stored').value) || 1),
-        });
-        showMessage(messageEl, 'Backup settings saved');
-        await refresh();
-      } catch (err) {
-        showMessage(messageEl, err.message, true);
-      } finally {
-        button.disabled = false;
-      }
-    });
-
-    document.getElementById('restore-file').addEventListener('change', async (event) => {
-      const input = event.currentTarget;
-      const file = input.files?.[0];
-      input.value = '';
-      if (!file)
-        return;
-
-      const statusEl = document.getElementById('restore-status');
-      statusEl.hidden = false;
-      statusEl.textContent = 'Restoring…';
-      try {
-        const result = await api.restoreBackupUpload(file);
-        showMessage(messageEl, result.message ?? 'Restore completed');
-        if (result.restartRecommended)
-          showMessage(messageEl, `${result.message ?? 'Restore completed'} Restart CherryBox to finish applying changes.`);
-        await refresh();
-      } catch (err) {
-        showMessage(messageEl, err.message, true);
-      } finally {
-        statusEl.hidden = true;
-      }
-    });
-
-    refresh().catch((err) => showMessage(messageEl, err.message, true));
-  </script>
-</body>
+    </script>
+  </body>
 </html>

@@ -1,6 +1,13 @@
 const API_BASE = '/api/v1';
 
 function getToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const queryToken = params.get('access_token');
+    if (queryToken) return queryToken;
+  } catch {
+    // ignore
+  }
   return localStorage.getItem('cherrybox_token');
 }
 
@@ -68,6 +75,10 @@ const api = {
       throw new Error(message);
     }
     return text ? JSON.parse(text) : null;
+  },
+  uploadSiteCookiesText: async (siteKey, cookieText) => {
+    const file = new File([String(cookieText || '')], 'cookies.txt', { type: 'text/plain' });
+    return api.uploadSiteCookies(siteKey, file);
   },
   listFolders: () => apiRequest('/library/folders'),
 };

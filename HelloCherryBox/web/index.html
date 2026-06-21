@@ -1,26 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hello CherryBox</title>
-  <style>
-    :root {
-      color-scheme: light;
-      font-family: system-ui, sans-serif;
-    }
-    body {
-      margin: 0;
-      padding: 1.5rem;
-      background: #fff5f8;
-      color: #4a2030;
-    }
-    h1 { margin-top: 0; color: #d63384; }
-    p { line-height: 1.5; }
-  </style>
-</head>
-<body>
-  <h1>Hello CherryBox</h1>
-  <p>This page is served from the plugin <code>web/</code> folder and shown in a main navigation tab.</p>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hello CherryBox</title>
+    <script src="/skins/cherrybox-plugin-api.js" defer></script>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Hello CherryBox</h1>
+      <p class="meta">This plugin page uses the stock CherryBox plugin theme.</p>
+      <div id="skin-picker"></div>
+      <p>Core skin: <strong id="core-skin">—</strong></p>
+      <button type="button" id="refresh">Refresh status</button>
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        CherryBoxPluginApi.initCherryBoxPlugin({
+          mountSkinPicker: document.getElementById('skin-picker'),
+        }).then(function (plugin) {
+          document.getElementById('core-skin').textContent = plugin.getCoreSkin();
+          document.getElementById('refresh').addEventListener('click', function () {
+            document.getElementById('core-skin').textContent = plugin.getCoreSkin();
+          });
+        }).catch(function (error) {
+          console.error(error);
+        });
+      });
+    </script>
+  </body>
 </html>

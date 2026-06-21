@@ -1,0 +1,9 @@
+.card {
+  border-width: 2px;
+  border-color: var(--pink-primary);
+}
+
+.card h1,
+.card h2 {
+  letter-spacing: 0.02em;
+}

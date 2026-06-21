@@ -1,0 +1,5 @@
+.card h1,
+.card h2 {
+  margin: 0 0 0.5rem;
+  color: var(--pink-dark);
+}

@@ -14,6 +14,9 @@ cherrybox/
     HelloCherryBox/
     Backup/
     StorySites/
+    Download/
+    PasswordReset/
+    ViewTime/
 ```
 
 ## Plugins
@@ -22,6 +25,10 @@ cherrybox/
 |--------|----|-------------|
 | [HelloCherryBox](HelloCherryBox/) | `hello-cherrybox` | Sample plugin |
 | [Backup](Backup/) | `backup` | Backup plugin marker (core backup logic ships in CherryBox) |
+| [StorySites](StorySites/) | `story-sites` | Import stories from supported external sites |
+| [Download](Download/) | `download` | Video downloader (yt-dlp queue, scan, metadata) |
+| [PasswordReset](PasswordReset/) | `password-reset` | SMTP password reset emails |
+| [ViewTime](ViewTime/) | `view-time` | Account view time limits, expiry, and minute requests |
 
 ## Build
 

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>View time</title>
+    <link rel="stylesheet" href="plugin-ui.css" />
+    <script src="/skins/cherrybox-plugin-api.js" defer></script>
+    <script src="plugin-api.js" defer></script>
+  </head>
+  <body>
+    <div class="card view-time-page">
+      <h1>View time limits</h1>
+      <p class="meta">
+        Manage viewing minutes, account expiry, auto-replenishment, and user requests for more time.
+        Playback time is tracked while users watch media when limits apply.
+      </p>
+      <div id="message" class="plugin-message" hidden></div>
+
+      <div class="settings-section">
+        <h2>Global time policy</h2>
+        <p class="meta">Default auto-grant settings for users with replenishment enabled.</p>
+        <form id="policy-form">
+          <div class="form-row">
+            <label for="policy-interval">Grant every</label>
+            <select id="policy-interval"></select>
+          </div>
+          <div class="form-row">
+            <label for="policy-minutes">Minutes to grant</label>
+            <input id="policy-minutes" type="number" min="1" value="60" />
+          </div>
+          <button type="submit" id="policy-btn">Save policy</button>
+        </form>
+        <p class="meta" id="policy-current"></p>
+      </div>
+
+      <div class="settings-section">
+        <h2>Users &amp; limits</h2>
+        <p class="meta">Set view minutes, account expiry, and auto-replenishment per user.</p>
+        <div id="users"></div>
+      </div>
+
+      <div class="settings-section">
+        <h2>Minute requests</h2>
+        <div id="requests"></div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var initPromise = window.CherryBoxPluginApi
+          ? CherryBoxPluginApi.initCherryBoxPlugin()
+          : Promise.resolve();
+
+        initPromise
+          .then(function () {
+            var ui = window.ViewTimePluginUi;
+            if (!ui) throw new Error('View time plugin UI failed to load.');
+
+            var api = ui.api;
+            var escapeHtml = ui.escapeHtml;
+            var showMessage = ui.showMessage;
+            var formatDate = ui.formatDate;
+            var intervalOptions = ui.intervalOptions;
+
+            var messageEl = document.getElementById('message');
+            var users = [];
+            var requests = [];
+            var editingUserId = null;
+            var editDraft = {};
+
+            function fillPolicySelect(select, value) {
+              select.innerHTML = intervalOptions(value);
+            }
+
+            function renderUsers() {
+              var el = document.getElementById('users');
+              if (!users.length) {
+                el.innerHTML = '<p class="meta">No users yet.</p>';
+                return;
+              }
+
+              el.innerHTML =
+                '<ul class="settings-list">' +
+                users
+                  .map(function (user) {
+                    var isEditing = editingUserId === user.id;
+                    var summary =
+                      (user.viewMinutesRemaining != null
+                        ? user.viewMinutesRemaining + ' min left'
+                        : 'Unlimited viewing') +
+                      (user.expiresAt ? ' · expires ' + formatDate(user.expiresAt) : '') +
+                      (user.autoReplenishEnabled ? ' · auto-replenish on' : '');
+
+                    return (
+                      '<li class="settings-list__row settings-list__row--stacked">' +
+                      '<div class="settings-list__row">' +
+                      '<div>' +
+                      '<strong>' +
+                      escapeHtml(user.username) +
+                      '</strong> — ' +
+                      escapeHtml(user.role) +
+                      (!user.isActive ? ' <span class="status status--failed">inactive</span>' : '') +
+                      '<p class="meta">' +
+                      escapeHtml(summary) +
+                      '</p>' +
+                      '</div>' +
+                      '<div class="settings-actions">' +
+                      '<button type="button" class="secondary" data-edit="' +
+                      user.id +
+                      '">' +
+                      (isEditing ? 'Cancel' : 'Edit limits') +
+                      '</button>' +
+                      '</div>' +
+                      '</div>' +
+                      (isEditing ? renderUserEdit(user) : '') +
+                      '</li>'
+                    );
+                  })
+                  .join('') +
+                '</ul>';
+
+              el.querySelectorAll('[data-edit]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                  var id = button.getAttribute('data-edit');
+                  if (editingUserId === id) {
+                    editingUserId = null;
+                    editDraft = {};
+                  } else {
+                    var user = users.find(function (u) {
+                      return u.id === id;
+                    });
+                    if (!user) return;
+                    editingUserId = id;
+                    editDraft = {
+                      viewMinutesRemaining:
+                        user.viewMinutesRemaining != null ? String(user.viewMinutesRemaining) : '',
+                      expiryDays: '',
+                      autoReplenishEnabled: user.autoReplenishEnabled,
+                      autoReplenishIntervalDays: user.autoReplenishIntervalDays ?? '',
+                      autoReplenishMinutes: user.autoReplenishMinutes ?? '',
+                    };
+                  }
+                  renderUsers();
+                });
+              });
+
+              el.querySelectorAll('[data-save-user]').forEach(function (button) {
+                button.addEventListener('click', async function () {
+                  var id = button.getAttribute('data-save-user');
+                  button.disabled = true;
+                  try {
+                    var payload = {
+                      autoReplenishEnabled: !!editDraft.autoReplenishEnabled,
+                    };
+                    if (editDraft.viewMinutesRemaining === '') payload.unlimitedViewTime = true;
+                    else payload.viewMinutesRemaining = Math.max(0, Number(editDraft.viewMinutesRemaining) || 0);
+                    if (editDraft.expiryDays !== '') payload.accountExpiryDays = Number(editDraft.expiryDays);
+                    if (editDraft.autoReplenishIntervalDays !== '')
+                      payload.autoReplenishIntervalDays = Number(editDraft.autoReplenishIntervalDays);
+                    if (editDraft.autoReplenishMinutes !== '')
+                      payload.autoReplenishMinutes = Number(editDraft.autoReplenishMinutes);
+
+                    await api.updateUser(id, payload);
+                    showMessage(messageEl, 'User limits updated');
+                    editingUserId = null;
+                    editDraft = {};
+                    await refresh();
+                  } catch (err) {
+                    showMessage(messageEl, err.message, true);
+                  } finally {
+                    button.disabled = false;
+                  }
+                });
+              });
+
+              el.querySelectorAll('[data-clear-expiry]').forEach(function (button) {
+                button.addEventListener('click', async function () {
+                  var id = button.getAttribute('data-clear-expiry');
+                  button.disabled = true;
+                  try {
+                    await api.updateUser(id, { clearAccountExpiry: true });
+                    showMessage(messageEl, 'Account expiry cleared');
+                    editingUserId = null;
+                    await refresh();
+                  } catch (err) {
+                    showMessage(messageEl, err.message, true);
+                  } finally {
+                    button.disabled = false;
+                  }
+                });
+              });
+
+              bindEditInputs(el);
+            }
+
+            function bindEditInputs(root) {
+              root.querySelectorAll('[data-field]').forEach(function (input) {
+                input.addEventListener('change', function () {
+                  var field = input.getAttribute('data-field');
+                  if (input.type === 'checkbox') editDraft[field] = input.checked;
+                  else editDraft[field] = input.value;
+                });
+              });
+            }
+
+            function renderUserEdit(user) {
+              return (
+                '<div class="user-edit-grid">' +
+                '<div class="form-row">' +
+                '<label>View minutes remaining</label>' +
+                '<input data-field="viewMinutesRemaining" type="number" min="0" placeholder="Unlimited" value="' +
+                escapeHtml(editDraft.viewMinutesRemaining ?? '') +
+                '" />' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label>Account expires after</label>' +
+                '<select data-field="expiryDays">' +
+                '<option value="">Keep current / never</option>' +
+                intervalOptions(editDraft.expiryDays) +
+                '</select>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label><input data-field="autoReplenishEnabled" type="checkbox"' +
+                (editDraft.autoReplenishEnabled ? ' checked' : '') +
+                ' /> Auto-replenish minutes</label>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label>Replenish every</label>' +
+                '<select data-field="autoReplenishIntervalDays">' +
+                '<option value="">Use global default</option>' +
+                intervalOptions(editDraft.autoReplenishIntervalDays) +
+                '</select>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label>Minutes per grant</label>' +
+                '<input data-field="autoReplenishMinutes" type="number" min="1" placeholder="Use global default" value="' +
+                escapeHtml(editDraft.autoReplenishMinutes ?? '') +
+                '" />' +
+                '</div>' +
+                '<div class="user-edit-actions">' +
+                '<button type="button" data-save-user="' +
+                user.id +
+                '">Save limits</button>' +
+                (user.expiresAt
+                  ? '<button type="button" class="secondary" data-clear-expiry="' + user.id + '">Clear expiry</button>'
+                  : '') +
+                '</div>' +
+                '</div>'
+              );
+            }
+
+            function renderRequests() {
+              var el = document.getElementById('requests');
+              var pending = requests.filter(function (r) {
+                return r.status === 'Pending';
+              });
+
+              if (!pending.length) {
+                el.innerHTML = '<p class="meta">No pending requests.</p>';
+                return;
+              }
+
+              el.innerHTML =
+                '<ul class="settings-list">' +
+                pending
+                  .map(function (request) {
+                    return (
+                      '<li class="settings-list__row settings-list__row--stacked">' +
+                      '<div>' +
+                      '<strong>' +
+                      escapeHtml(request.username) +
+                      '</strong>' +
+                      (request.requestedMinutes != null
+                        ? ' — requested ' + request.requestedMinutes + ' min'
+                        : '') +
+                      (request.message ? '<p class="meta">' + escapeHtml(request.message) + '</p>' : '') +
+                      '</div>' +
+                      '<div class="accounts-resolve">' +
+                      '<input type="number" min="1" placeholder="Minutes" data-grant="' +
+                      request.id +
+                      '" />' +
+                      '<input type="text" placeholder="Note (optional)" data-note="' +
+                      request.id +
+                      '" />' +
+                      '<button type="button" data-approve="' +
+                      request.id +
+                      '">Approve</button>' +
+                      '<button type="button" class="secondary" data-deny="' +
+                      request.id +
+                      '">Deny</button>' +
+                      '</div>' +
+                      '</li>'
+                    );
+                  })
+                  .join('') +
+                '</ul>';
+
+              el.querySelectorAll('[data-approve]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                  resolveRequest(button.getAttribute('data-approve'), true);
+                });
+              });
+              el.querySelectorAll('[data-deny]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                  resolveRequest(button.getAttribute('data-deny'), false);
+                });
+              });
+            }
+
+            async function resolveRequest(id, approve) {
+              try {
+                var grantEl = document.querySelector('[data-grant="' + id + '"]');
+                var noteEl = document.querySelector('[data-note="' + id + '"]');
+                var granted = grantEl && grantEl.value ? Number(grantEl.value) : undefined;
+                var note = noteEl ? noteEl.value : undefined;
+                await api.resolveTimeRequest(id, approve, granted, note);
+                showMessage(messageEl, approve ? 'Request approved' : 'Request denied');
+                await refresh();
+              } catch (err) {
+                showMessage(messageEl, err.message, true);
+              }
+            }
+
+            async function refresh() {
+              var results = await Promise.all([
+                api.getUserTimePolicy(),
+                api.listUsers(),
+                api.listTimeRequests(),
+              ]);
+              var policy = results[0];
+              users = results[1];
+              requests = results[2];
+
+              fillPolicySelect(document.getElementById('policy-interval'), policy.defaultAutoReplenishIntervalDays);
+              document.getElementById('policy-minutes').value = policy.defaultAutoReplenishMinutes;
+              document.getElementById('policy-current').textContent =
+                'Current: every ' +
+                policy.defaultAutoReplenishIntervalDays +
+                ' days, ' +
+                policy.defaultAutoReplenishMinutes +
+                ' minutes.';
+
+              renderUsers();
+              renderRequests();
+            }
+
+            document.getElementById('policy-form').addEventListener('submit', async function (event) {
+              event.preventDefault();
+              var button = document.getElementById('policy-btn');
+              button.disabled = true;
+              try {
+                await api.updateUserTimePolicy(
+                  Number(document.getElementById('policy-interval').value),
+                  Math.max(1, Number(document.getElementById('policy-minutes').value) || 1),
+                );
+                showMessage(messageEl, 'Time policy saved');
+                await refresh();
+              } catch (err) {
+                showMessage(messageEl, err.message, true);
+              } finally {
+                button.disabled = false;
+              }
+            });
+
+            return refresh();
+          })
+          .catch(function (err) {
+            var messageEl = document.getElementById('message');
+            if (messageEl) {
+              messageEl.hidden = false;
+              messageEl.textContent = err.message || 'Failed to load view time settings';
+              messageEl.className = 'plugin-message error';
+            }
+            console.error(err);
+          });
+      });
+    </script>
+  </body>
+</html>

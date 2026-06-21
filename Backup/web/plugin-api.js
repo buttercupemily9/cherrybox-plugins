@@ -1,6 +1,13 @@
 const API_BASE = '/api/v1';
 
 function getToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const queryToken = params.get('access_token');
+    if (queryToken) return queryToken;
+  } catch {
+    // ignore
+  }
   return localStorage.getItem('cherrybox_token');
 }
 
