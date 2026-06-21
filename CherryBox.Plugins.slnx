@@ -5,5 +5,6 @@
   <Project Path="StoryImportCommon/StoryImportCommon.csproj" />
   <Project Path="StorySites/StorySites.Plugin.csproj" />
   <Project Path="Download/Download.Plugin.csproj" />
+  <Project Path="PasswordReset/PasswordReset.Plugin.csproj" />
   <Project Path="ViewTime/ViewTime.Plugin.csproj" />
 </Solution>
