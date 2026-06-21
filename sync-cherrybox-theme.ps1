@@ -6,10 +6,35 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if ([string]::IsNullOrWhiteSpace($Source)) {
-    $repoRoot = Split-Path -Parent $PluginsRoot
-    $Source = Join-Path $repoRoot "web\public\skins"
+function Resolve-CherryBoxThemeSource {
+    param(
+        [string]$PluginsRoot,
+        [string]$ExplicitSource
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitSource)) {
+        if (-not (Test-Path $ExplicitSource)) {
+            throw "CherryBox theme source not found: $ExplicitSource"
+        }
+        return (Resolve-Path $ExplicitSource).Path
+    }
+
+    $candidates = @(
+        (Join-Path $PluginsRoot "_cherrybox\web\public\skins"),
+        (Join-Path (Split-Path -Parent $PluginsRoot) "web\public\skins")
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    $tried = ($candidates | ForEach-Object { "  - $_" }) -join [Environment]::NewLine
+    throw "CherryBox theme source not found. Pass -Source or check out cherrybox beside plugins. Tried:$([Environment]::NewLine)$tried"
 }
+
+$Source = Resolve-CherryBoxThemeSource -PluginsRoot $PluginsRoot -ExplicitSource $Source
 
 $files = @(
     "tokens.css",
@@ -18,17 +43,6 @@ $files = @(
     "cherrybox-plugin-shell.js",
     "cherrybox-plugin-api.js"
 )
-
-if (-not (Test-Path $Source)) {
-    $fallback = Join-Path (Split-Path -Parent $PluginsRoot) "web\public\skins"
-    if (Test-Path $fallback) {
-        $Source = $fallback
-    }
-}
-
-if (-not (Test-Path $Source)) {
-    throw "CherryBox theme source not found: $Source"
-}
 
 $synced = 0
 Get-ChildItem -Path $PluginsRoot -Directory | ForEach-Object {
@@ -47,4 +61,4 @@ Get-ChildItem -Path $PluginsRoot -Directory | ForEach-Object {
     $synced++
 }
 
-Write-Host "Synced CherryBox theme into $synced plugin(s)."
+Write-Host "Synced CherryBox theme into $synced plugin(s) from $Source"

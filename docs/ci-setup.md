@@ -23,7 +23,9 @@ Re-run the failed workflow after saving the secret.
 
 ## Local vs CI layout
 
-| Layout | `CherryBoxRoot` resolves to |
-|--------|----------------------------|
-| Submodule (`cherrybox/plugins/`) | Parent cherrybox repo |
-| Plugins CI | `_cherrybox/` (checked out by the workflow) |
+| Layout | Theme source |
+|--------|----------------|
+| Submodule (`cherrybox/plugins/`) | `../web/public/skins` (auto-detected) |
+| Plugins CI | `_cherrybox/web/public/skins` (checked out by the workflow) |
+
+`build-packages.ps1` accepts `-ThemeSource` when the theme folder is not auto-detected.

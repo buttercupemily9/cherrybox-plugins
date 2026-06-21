@@ -63,7 +63,7 @@ jobs:
 
       - name: Package plugins
         shell: pwsh
-        run: ./build-packages.ps1
+        run: ./build-packages.ps1 -ThemeSource _cherrybox/web/public/skins
 
       - name: Verify packages
         shell: pwsh
