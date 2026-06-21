@@ -1,0 +1,78 @@
+a {
+  color: var(--pink-dark);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.2rem;
+  background: var(--button-gradient);
+  color: white;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+button.secondary {
+  background: white;
+  color: var(--pink-dark);
+  border: 2px solid var(--pink-light);
+}
+
+input,
+select,
+textarea {
+  border: 2px solid var(--pink-light);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  background: white;
+  color: var(--text-main);
+  width: 100%;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 182, 193, 0.4);
+}
+
+.meta {
+  color: var(--pink-dark);
+  margin: 0.25rem 0 0.75rem;
+}
+
+.error {
+  color: #c0392b;
+  margin-top: 0.5rem;
+}
+
+.form-row {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.search-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.plugin-skin-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.plugin-skin-picker label {
+  font-weight: 600;
+  color: var(--pink-dark);
+}
+
+.plugin-skin-picker select {
+  max-width: 220px;
+}

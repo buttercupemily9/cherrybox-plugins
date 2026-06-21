@@ -4,8 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Site logins</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
   <link rel="stylesheet" href="plugin-ui.css" />
-  <script src="/skins/cherrybox-plugin-api.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
   <script src="supported-sites.js" defer></script>
   <script src="plugin-api.js" defer></script>
 </head>
@@ -96,20 +98,43 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      var initPromise = window.CherryBoxPluginApi
-        ? CherryBoxPluginApi.initCherryBoxPlugin()
-        : Promise.resolve();
+      if (window.CherryBoxPluginApi) {
+        CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+          console.warn('CherryBox plugin theme init failed', err);
+        });
+      }
 
-      initPromise
-        .then(function () {
-          var ui = window.DownloadPluginUi;
-          if (!ui) throw new Error('Download plugin UI failed to load.');
+      var ui = window.DownloadPluginUi;
+      if (!ui) {
+        var messageEl = document.getElementById('message');
+        if (messageEl) {
+          messageEl.hidden = false;
+          messageEl.textContent = 'Download plugin UI failed to load.';
+          messageEl.className = 'plugin-message error';
+        }
+        return;
+      }
 
-          var api = ui.api;
+      var api = ui.api;
           var escapeHtml = ui.escapeHtml;
           var showMessage = ui.showMessage;
 
           var SUPPORTED_SITES = window.DownloadSupportedSites || [];
+          var siteSearch = window.DownloadSiteSearch || {
+            filter: function (query) {
+              var normalized = normalizeSiteKey(query);
+              if (!normalized) return [];
+              return SUPPORTED_SITES.filter(function (site) {
+                return site.id.includes(normalized) || site.label.toLowerCase().includes(normalized);
+              }).slice(0, 12);
+            },
+            findExact: function (query) {
+              return findSupportedSite(query);
+            },
+            isLikelyMatch: function () {
+              return false;
+            },
+          };
           var messageEl = document.getElementById('message');
           var siteAuth = [];
           var selectedSite = null;
@@ -119,6 +144,10 @@
           }
 
           function findSupportedSite(siteKey) {
+            if (siteSearch.findExact) {
+              var exact = siteSearch.findExact(siteKey, SUPPORTED_SITES);
+              if (exact) return exact;
+            }
             var normalized = normalizeSiteKey(siteKey);
             if (!normalized) return null;
             return SUPPORTED_SITES.find(function (site) {
@@ -127,13 +156,7 @@
           }
 
           function filterSupportedSites(query) {
-            var normalized = normalizeSiteKey(query);
-            if (!normalized) return [];
-            return SUPPORTED_SITES.filter(function (site) {
-              if (site.id.includes(normalized)) return true;
-              if (site.label.toLowerCase().includes(normalized)) return true;
-              return false;
-            }).slice(0, 12);
+            return siteSearch.filter(query, SUPPORTED_SITES, 12);
           }
 
           function isConfigured(siteKey) {
@@ -193,9 +216,9 @@
             var emptyEl = document.getElementById('site-search-empty');
             var hintEl = document.getElementById('site-search-hint');
             var matches = filterSupportedSites(query);
-            var normalized = normalizeSiteKey(query);
+            var trimmed = String(query || '').trim();
 
-            if (!normalized) {
+            if (!trimmed) {
               list.hidden = true;
               list.innerHTML = '';
               emptyEl.classList.add('hidden');
@@ -217,8 +240,10 @@
             hintEl.classList.add('hidden');
 
             list.innerHTML = matches
-              .map(function (site) {
+              .map(function (site, index) {
                 var configured = isConfigured(site.id) ? ' · configured' : '';
+                var likely =
+                  index === 0 && siteSearch.isLikelyMatch(query, site) ? ' · likely match' : '';
                 return (
                   '<li><button type="button" data-site-id="' +
                   escapeHtml(site.id) +
@@ -226,6 +251,7 @@
                   escapeHtml(site.label) +
                   ' <span class="meta">(' +
                   escapeHtml(site.id) +
+                  likely +
                   configured +
                   ')</span></button></li>'
                 );
@@ -242,8 +268,8 @@
               });
             });
 
-            var exact = findSupportedSite(normalized);
-            if (exact && matches.length === 1 && matches[0].id === exact.id) {
+            var exact = findSupportedSite(query);
+            if (exact && matches.length >= 1 && matches[0].id === exact.id) {
               selectSite(exact);
             }
           }
@@ -407,17 +433,9 @@
             }
           });
 
-          return refreshSiteAuth();
-        })
-        .catch(function (err) {
-          var messageEl = document.getElementById('message');
-          if (messageEl) {
-            messageEl.hidden = false;
-            messageEl.textContent = err.message || 'Failed to load site logins';
-            messageEl.className = 'plugin-message error';
-          }
-          console.error(err);
-        });
+          refreshSiteAuth().catch(function (err) {
+            showMessage(messageEl, err.message, true);
+          });
     });
   </script>
 </body>

@@ -4,8 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Backup</title>
+    <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
     <link rel="stylesheet" href="plugin-ui.css" />
-    <script src="/skins/cherrybox-plugin-api.js" defer></script>
+    <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+    <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
     <script src="plugin-api.js" defer></script>
   </head>
   <body>
@@ -62,16 +64,24 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
-        var initPromise = window.CherryBoxPluginApi
-          ? CherryBoxPluginApi.initCherryBoxPlugin()
-          : Promise.resolve();
+        if (window.CherryBoxPluginApi) {
+          CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+            console.warn('CherryBox plugin theme init failed', err);
+          });
+        }
 
-        initPromise
-          .then(function () {
-            var ui = window.BackupPluginUi;
-            if (!ui) throw new Error('Backup plugin UI failed to load.');
+        var ui = window.BackupPluginUi;
+        if (!ui) {
+          var messageEl = document.getElementById('message');
+          if (messageEl) {
+            messageEl.hidden = false;
+            messageEl.textContent = 'Backup plugin UI failed to load.';
+            messageEl.className = 'plugin-message error';
+          }
+          return;
+        }
 
-            var api = ui.api;
+        var api = ui.api;
             var formatTime = ui.formatTime;
             var formatBytes = ui.formatBytes;
             var escapeHtml = ui.escapeHtml;
@@ -283,17 +293,9 @@
               }
             });
 
-            return refresh();
-          })
-          .catch(function (err) {
-            var messageEl = document.getElementById('message');
-            if (messageEl) {
-              messageEl.hidden = false;
-              messageEl.textContent = err.message || 'Failed to load backup UI';
-              messageEl.className = 'plugin-message error';
-            }
-            console.error(err);
-          });
+            refresh().catch(function (err) {
+              showMessage(messageEl, err.message, true);
+            });
       });
     </script>
   </body>

@@ -4,8 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>View time</title>
+    <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
     <link rel="stylesheet" href="plugin-ui.css" />
-    <script src="/skins/cherrybox-plugin-api.js" defer></script>
+    <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+    <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
     <script src="plugin-api.js" defer></script>
   </head>
   <body>
@@ -48,16 +50,24 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
-        var initPromise = window.CherryBoxPluginApi
-          ? CherryBoxPluginApi.initCherryBoxPlugin()
-          : Promise.resolve();
+        if (window.CherryBoxPluginApi) {
+          CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+            console.warn('CherryBox plugin theme init failed', err);
+          });
+        }
 
-        initPromise
-          .then(function () {
-            var ui = window.ViewTimePluginUi;
-            if (!ui) throw new Error('View time plugin UI failed to load.');
+        var ui = window.ViewTimePluginUi;
+        if (!ui) {
+          var messageEl = document.getElementById('message');
+          if (messageEl) {
+            messageEl.hidden = false;
+            messageEl.textContent = 'View time plugin UI failed to load.';
+            messageEl.className = 'plugin-message error';
+          }
+          return;
+        }
 
-            var api = ui.api;
+        var api = ui.api;
             var escapeHtml = ui.escapeHtml;
             var showMessage = ui.showMessage;
             var formatDate = ui.formatDate;
@@ -363,17 +373,9 @@
               }
             });
 
-            return refresh();
-          })
-          .catch(function (err) {
-            var messageEl = document.getElementById('message');
-            if (messageEl) {
-              messageEl.hidden = false;
-              messageEl.textContent = err.message || 'Failed to load view time settings';
-              messageEl.className = 'plugin-message error';
-            }
-            console.error(err);
-          });
+            refresh().catch(function (err) {
+              showMessage(messageEl, err.message, true);
+            });
       });
     </script>
   </body>

@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 
+& (Join-Path $root "sync-cherrybox-theme.ps1")
+
 if ([string]::IsNullOrWhiteSpace($ProgramDataRoot)) {
     $ProgramDataRoot = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) "CherryBox\plugins"
 }

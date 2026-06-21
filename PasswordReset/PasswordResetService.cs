@@ -53,32 +53,30 @@ internal sealed class PasswordResetService : IPasswordResetService
 
     public Task<PasswordResetSettingsDto> UpdateSettingsAsync(UpdatePasswordResetSettingsRequest request, CancellationToken cancellationToken = default)
     {
+        if (request is null)
+            throw new InvalidOperationException("Request body is required.");
+
         if (request.TokenLifetimeMinutes < 5 || request.TokenLifetimeMinutes > 24 * 60)
             throw new InvalidOperationException("Token lifetime must be between 5 and 1440 minutes.");
 
         var current = _settingsStore.Get();
-        var next = new PasswordResetSettings
-        {
-            Enabled = request.Enabled,
-            SmtpHost = request.SmtpHost.Trim(),
-            SmtpPort = request.SmtpPort,
-            UseTls = request.UseTls,
-            Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
-            Password = string.IsNullOrWhiteSpace(request.Password) ? current.Password : request.Password,
-            FromAddress = request.FromAddress.Trim(),
-            FromDisplayName = string.IsNullOrWhiteSpace(request.FromDisplayName) ? "CherryBox" : request.FromDisplayName.Trim(),
-            PublicBaseUrl = request.PublicBaseUrl.Trim().TrimEnd('/'),
-            TokenLifetimeMinutes = request.TokenLifetimeMinutes
-        };
+        var next = MergeSettings(request, current);
 
         _settingsStore.Save(next);
         return Task.FromResult(ToDto(next));
     }
 
-    public async Task SendTestEmailAsync(string toAddress, CancellationToken cancellationToken = default)
+    public async Task SendTestEmailAsync(
+        string toAddress,
+        UpdatePasswordResetSettingsRequest? draftSettings = null,
+        CancellationToken cancellationToken = default)
     {
-        var settings = _settingsStore.Get();
-        ValidateSendSettings(settings);
+        var current = _settingsStore.Get();
+        var settings = draftSettings is null ? current : MergeSettings(draftSettings, current);
+        ValidateSendSettings(settings, requirePublicBaseUrl: false);
+
+        if (!string.IsNullOrWhiteSpace(settings.Username) && string.IsNullOrWhiteSpace(settings.Password))
+            throw new InvalidOperationException("SMTP password is required to send a test email.");
 
         await _emailSender.SendAsync(
             settings,
@@ -189,6 +187,21 @@ internal sealed class PasswordResetService : IPasswordResetService
         return username.Contains('@', StringComparison.Ordinal) ? username.Trim() : null;
     }
 
+    private static PasswordResetSettings MergeSettings(UpdatePasswordResetSettingsRequest request, PasswordResetSettings current) =>
+        new()
+        {
+            Enabled = request.Enabled,
+            SmtpHost = request.SmtpHost?.Trim() ?? string.Empty,
+            SmtpPort = request.SmtpPort,
+            UseTls = request.UseTls,
+            Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
+            Password = string.IsNullOrWhiteSpace(request.Password) ? current.Password : request.Password,
+            FromAddress = request.FromAddress?.Trim() ?? string.Empty,
+            FromDisplayName = string.IsNullOrWhiteSpace(request.FromDisplayName) ? "CherryBox" : request.FromDisplayName.Trim(),
+            PublicBaseUrl = request.PublicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty,
+            TokenLifetimeMinutes = request.TokenLifetimeMinutes
+        };
+
     private static PasswordResetSettingsDto ToDto(PasswordResetSettings settings) => new(
         settings.Enabled,
         settings.SmtpHost,
@@ -201,7 +214,7 @@ internal sealed class PasswordResetService : IPasswordResetService
         settings.PublicBaseUrl,
         settings.TokenLifetimeMinutes);
 
-    private static void ValidateSendSettings(PasswordResetSettings settings)
+    private static void ValidateSendSettings(PasswordResetSettings settings, bool requirePublicBaseUrl = true)
     {
         if (string.IsNullOrWhiteSpace(settings.SmtpHost))
             throw new InvalidOperationException("SMTP host is required.");
@@ -209,7 +222,7 @@ internal sealed class PasswordResetService : IPasswordResetService
             throw new InvalidOperationException("SMTP port must be positive.");
         if (string.IsNullOrWhiteSpace(settings.FromAddress))
             throw new InvalidOperationException("From address is required.");
-        if (string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
+        if (requirePublicBaseUrl && string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
             throw new InvalidOperationException("Public base URL is required.");
     }
 }
