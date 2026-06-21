@@ -26,7 +26,9 @@ public sealed record UpdatePasswordResetSettingsRequest(
     string PublicBaseUrl,
     int TokenLifetimeMinutes);
 
-public sealed record SendPasswordResetTestEmailRequest(string ToAddress);
+public sealed record SendPasswordResetTestEmailRequest(
+    string ToAddress,
+    UpdatePasswordResetSettingsRequest? Settings = null);
 
 public sealed record SetUserEmailRequest(string? Email);
 
@@ -35,7 +37,10 @@ public interface IPasswordResetService
     PasswordResetStatusDto GetStatus();
     Task<PasswordResetSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task<PasswordResetSettingsDto> UpdateSettingsAsync(UpdatePasswordResetSettingsRequest request, CancellationToken cancellationToken = default);
-    Task SendTestEmailAsync(string toAddress, CancellationToken cancellationToken = default);
+    Task SendTestEmailAsync(
+        string toAddress,
+        UpdatePasswordResetSettingsRequest? draftSettings = null,
+        CancellationToken cancellationToken = default);
     Task RequestResetAsync(string usernameOrEmail, CancellationToken cancellationToken = default);
     Task<bool> ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default);
     Task<string?> GetUserEmailAsync(Guid userId, CancellationToken cancellationToken = default);
