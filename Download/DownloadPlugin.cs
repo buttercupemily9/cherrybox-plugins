@@ -42,7 +42,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
             sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
             jobTracker,
             sp.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
-            sp.GetRequiredService<IDownloadLimitService>()));
+            registry.Resolve<IDownloadLimitService>(sp)!));
         registry.RegisterSupportAppUpdater(ytDlpInstaller);
     }
 
