@@ -48,12 +48,16 @@ foreach ($plugin in $plugins) {
     Copy-Item -Force (Join-Path $sourceDir "plugin.json") $stagingDir
 
     $webDir = Join-Path $sourceDir "web"
+    $destWeb = Join-Path $stagingDir "web"
+    if (Test-Path $destWeb) {
+        Remove-Item -Recurse -Force $destWeb
+    }
     if (Test-Path $webDir) {
-        Copy-Item -Recurse -Force $webDir (Join-Path $stagingDir "web")
+        Copy-Item -Recurse -Force $webDir $destWeb
     }
 
-    # Abstractions are provided by the CherryBox host; bundling a copy breaks plugin loading.
-    Get-ChildItem -Path $stagingDir -Filter "CherryBox.Plugins.Abstractions.*" | Remove-Item -Force
+    # Host assemblies are provided by CherryBox; bundling copies breaks plugin loading.
+    Get-ChildItem -Path $stagingDir -Filter "CherryBox.*" | Remove-Item -Force
 
     $assemblyName = ([xml](Get-Content (Join-Path $sourceDir $plugin.Project))).Project.PropertyGroup.AssemblyName
     if (-not $assemblyName) {
