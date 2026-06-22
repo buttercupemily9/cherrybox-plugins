@@ -174,10 +174,10 @@ public sealed class DownloadLimitService : IDownloadLimitService
         var requests = await _db.DownloadLimitRequests
             .AsNoTracking()
             .Include(r => r.User)
-            .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(cancellationToken);
 
         return requests
+            .OrderByDescending(r => r.CreatedAt)
             .Select(r => ToRequestDto(r, r.User?.Username ?? "Unknown"))
             .ToList();
     }
