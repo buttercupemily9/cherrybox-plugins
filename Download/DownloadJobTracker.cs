@@ -7,6 +7,7 @@ public interface IDownloadJobTracker
 {
     void Register(Guid jobId, Process process);
     void Unregister(Guid jobId);
+    bool IsTracked(Guid jobId);
     bool TryCancel(Guid jobId);
 }
 
@@ -17,6 +18,8 @@ public sealed class DownloadJobTracker : IDownloadJobTracker
     public void Register(Guid jobId, Process process) => _processes[jobId] = process;
 
     public void Unregister(Guid jobId) => _processes.TryRemove(jobId, out _);
+
+    public bool IsTracked(Guid jobId) => _processes.ContainsKey(jobId);
 
     public bool TryCancel(Guid jobId)
     {

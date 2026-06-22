@@ -62,6 +62,11 @@ body {
   word-break: break-all;
 }
 
+.download-row__user {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .download-row__actions {
   display: flex;
   gap: 0.5rem;
@@ -234,4 +239,17 @@ button.danger {
   display: flex;
   gap: 0.5rem;
   flex-shrink: 0;
+}
+
+.download-user-edit,
+.download-request-resolve {
+  width: 100%;
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.download-request-resolve {
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  align-items: center;
 }

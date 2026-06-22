@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Download accounts</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
+</head>
+<body>
+  <div class="card download-page">
+    <h1>Download limits</h1>
+    <p class="meta">
+      Set how many successful downloads each user can queue per hour, day, week, month, or year.
+      Only completed downloads count; failed jobs and retries do not use extra quota.
+      Videos always save to the Downloads library folder.
+    </p>
+    <div id="message" class="plugin-message" hidden></div>
+
+    <div class="settings-section">
+      <h2>Default limit</h2>
+      <form id="policy-form">
+        <div class="form-row">
+          <label for="default-max">Max downloads</label>
+          <input id="default-max" type="number" min="0" value="0" />
+          <p class="meta">0 = unlimited for users without a personal override.</p>
+        </div>
+        <div class="form-row">
+          <label for="default-period">Per</label>
+          <select id="default-period">
+            <option value="Hour">Hour</option>
+            <option value="Day">Day</option>
+            <option value="Week">Week</option>
+            <option value="Month">Month</option>
+            <option value="Year">Year</option>
+          </select>
+        </div>
+        <button type="submit" id="policy-btn">Save default</button>
+      </form>
+    </div>
+
+    <div class="settings-section">
+      <h2>Users</h2>
+      <div id="users"></div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Download requests</h2>
+      <div id="requests"></div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.CherryBoxPluginApi) {
+        CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+          console.warn('CherryBox plugin theme init failed', err);
+        });
+      }
+
+      var ui = window.DownloadPluginUi;
+      if (!ui) return;
+
+      var api = ui.api;
+      var showMessage = ui.showMessage;
+      var escapeHtml = ui.escapeHtml;
+      var messageEl = document.getElementById('message');
+      var usersEl = document.getElementById('users');
+      var requestsEl = document.getElementById('requests');
+      var editingUserId = null;
+      var editDraft = {};
+      var resolveDraft = {};
+
+      var PERIOD_LABELS = {
+        Hour: 'hour',
+        Day: 'day',
+        Week: 'week',
+        Month: 'month',
+        Year: 'year',
+      };
+
+      function periodOptions(selected) {
+        return ['Hour', 'Day', 'Week', 'Month', 'Year']
+          .map(function (value) {
+            return (
+              '<option value="' +
+              value +
+              '"' +
+              (value === selected ? ' selected' : '') +
+              '>' +
+              value +
+              '</option>'
+            );
+          })
+          .join('');
+      }
+
+      function renderUsers(users) {
+        if (!users.length) {
+          usersEl.innerHTML = '<p class="meta">No users yet.</p>';
+          return;
+        }
+
+        usersEl.innerHTML =
+          '<ul class="settings-list">' +
+          users
+            .map(function (user) {
+              var isEditing = editingUserId === user.id;
+              var draft = editDraft[user.id] || {};
+              var limitSummary =
+                user.role === 'Admin'
+                  ? 'Unlimited (admin)'
+                  : user.effectiveLimitMax <= 0
+                    ? 'Unlimited'
+                    : user.usedCount +
+                      user.inFlightCount +
+                      '/' +
+                      (user.effectiveLimitMax + user.bonusCount) +
+                      ' per ' +
+                      (PERIOD_LABELS[user.effectivePeriod] || user.effectivePeriod.toLowerCase()) +
+                      (user.bonusCount ? ' (+' + user.bonusCount + ' bonus)' : '');
+
+              return (
+                '<li class="settings-list__row">' +
+                '<div>' +
+                '<strong>' +
+                escapeHtml(user.username) +
+                '</strong> — ' +
+                escapeHtml(user.role) +
+                '<p class="meta">' +
+                escapeHtml(limitSummary) +
+                '</p>' +
+                '</div>' +
+                (user.role === 'Admin'
+                  ? ''
+                  : '<div class="settings-actions">' +
+                    '<button type="button" class="secondary" data-edit="' +
+                    user.id +
+                    '">' +
+                    (isEditing ? 'Cancel' : 'Edit') +
+                    '</button>' +
+                    '</div>') +
+                (isEditing
+                  ? '<div class="download-user-edit">' +
+                    '<div class="form-row">' +
+                    '<label><input type="checkbox" data-use-default="' +
+                    user.id +
+                    '"' +
+                    (draft.useDefault ? ' checked' : '') +
+                    ' /> Use default limit</label>' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                    '<label>Max downloads</label>' +
+                    '<input type="number" min="0" data-max="' +
+                    user.id +
+                    '" value="' +
+                    escapeHtml(draft.max ?? '') +
+                    '" placeholder="Unlimited"' +
+                    (draft.useDefault ? ' disabled' : '') +
+                    ' />' +
+                    '</div>' +
+                    '<div class="form-row">' +
+                    '<label>Per</label>' +
+                    '<select data-period="' +
+                    user.id +
+                    '"' +
+                    (draft.useDefault ? ' disabled' : '') +
+                    '>' +
+                    periodOptions(draft.period || user.effectivePeriod) +
+                    '</select>' +
+                    '</div>' +
+                    '<button type="button" data-save="' +
+                    user.id +
+                    '">Save</button>' +
+                    '</div>'
+                  : '') +
+                '</li>'
+              );
+            })
+            .join('') +
+          '</ul>';
+
+        usersEl.querySelectorAll('[data-edit]').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var userId = button.getAttribute('data-edit');
+            if (editingUserId === userId) {
+              editingUserId = null;
+              renderUsers(users);
+              return;
+            }
+            var user = users.find(function (item) {
+              return item.id === userId;
+            });
+            editingUserId = userId;
+            editDraft[userId] = {
+              useDefault: user.downloadLimitMax == null && user.downloadLimitPeriod == null,
+              max: user.downloadLimitMax != null ? String(user.downloadLimitMax) : '',
+              period: user.downloadLimitPeriod || user.effectivePeriod,
+            };
+            renderUsers(users);
+          });
+        });
+
+        usersEl.querySelectorAll('[data-use-default]').forEach(function (input) {
+          input.addEventListener('change', function () {
+            var userId = input.getAttribute('data-use-default');
+            editDraft[userId] = editDraft[userId] || {};
+            editDraft[userId].useDefault = input.checked;
+            renderUsers(users);
+          });
+        });
+
+        usersEl.querySelectorAll('[data-max]').forEach(function (input) {
+          input.addEventListener('input', function () {
+            var userId = input.getAttribute('data-max');
+            editDraft[userId] = editDraft[userId] || {};
+            editDraft[userId].max = input.value;
+          });
+        });
+
+        usersEl.querySelectorAll('[data-period]').forEach(function (select) {
+          select.addEventListener('change', function () {
+            var userId = select.getAttribute('data-period');
+            editDraft[userId] = editDraft[userId] || {};
+            editDraft[userId].period = select.value;
+          });
+        });
+
+        usersEl.querySelectorAll('[data-save]').forEach(function (button) {
+          button.addEventListener('click', async function () {
+            var userId = button.getAttribute('data-save');
+            var draft = editDraft[userId] || {};
+            button.disabled = true;
+            try {
+              var payload = { useDefaultLimit: Boolean(draft.useDefault) };
+              if (!draft.useDefault) {
+                payload.downloadLimitMax =
+                  draft.max === '' || draft.max == null ? 0 : Math.max(0, Number(draft.max) || 0);
+                payload.downloadLimitPeriod = draft.period || 'Week';
+              }
+              await api.updateDownloadLimitUser(userId, payload);
+              editingUserId = null;
+              showMessage(messageEl, 'User download limits saved');
+              await refresh();
+            } catch (err) {
+              showMessage(messageEl, err.message, true);
+            } finally {
+              button.disabled = false;
+            }
+          });
+        });
+      }
+
+      function renderRequests(requests) {
+        var pending = requests.filter(function (request) {
+          return request.status === 'Pending';
+        });
+        if (!pending.length) {
+          requestsEl.innerHTML = '<p class="meta">No pending requests.</p>';
+          return;
+        }
+
+        requestsEl.innerHTML =
+          '<ul class="settings-list">' +
+          pending
+            .map(function (request) {
+              var draft = resolveDraft[request.id] || { count: '', note: '' };
+              return (
+                '<li class="settings-list__row">' +
+                '<div>' +
+                '<strong>' +
+                escapeHtml(request.username) +
+                '</strong>' +
+                (request.requestedCount != null ? ' — requested ' + request.requestedCount : '') +
+                (request.message ? '<p class="meta">' + escapeHtml(request.message) + '</p>' : '') +
+                '</div>' +
+                '<div class="settings-actions download-request-resolve">' +
+                '<input type="number" min="1" placeholder="Grant" data-grant="' +
+                request.id +
+                '" value="' +
+                escapeHtml(draft.count) +
+                '" />' +
+                '<input type="text" placeholder="Note" data-note="' +
+                request.id +
+                '" value="' +
+                escapeHtml(draft.note) +
+                '" />' +
+                '<button type="button" data-approve="' +
+                request.id +
+                '">Approve</button>' +
+                '<button type="button" class="secondary" data-deny="' +
+                request.id +
+                '">Deny</button>' +
+                '</div>' +
+                '</li>'
+              );
+            })
+            .join('') +
+          '</ul>';
+
+        requestsEl.querySelectorAll('[data-grant]').forEach(function (input) {
+          input.addEventListener('input', function () {
+            var id = input.getAttribute('data-grant');
+            resolveDraft[id] = resolveDraft[id] || { count: '', note: '' };
+            resolveDraft[id].count = input.value;
+          });
+        });
+
+        requestsEl.querySelectorAll('[data-note]').forEach(function (input) {
+          input.addEventListener('input', function () {
+            var id = input.getAttribute('data-note');
+            resolveDraft[id] = resolveDraft[id] || { count: '', note: '' };
+            resolveDraft[id].note = input.value;
+          });
+        });
+
+        requestsEl.querySelectorAll('[data-approve]').forEach(function (button) {
+          button.addEventListener('click', async function () {
+            var id = button.getAttribute('data-approve');
+            var draft = resolveDraft[id] || { count: '', note: '' };
+            button.disabled = true;
+            try {
+              await api.resolveDownloadLimitRequest(
+                id,
+                true,
+                draft.count ? Number(draft.count) : undefined,
+                draft.note || undefined,
+              );
+              showMessage(messageEl, 'Request approved');
+              await refresh();
+            } catch (err) {
+              showMessage(messageEl, err.message, true);
+            } finally {
+              button.disabled = false;
+            }
+          });
+        });
+
+        requestsEl.querySelectorAll('[data-deny]').forEach(function (button) {
+          button.addEventListener('click', async function () {
+            var id = button.getAttribute('data-deny');
+            var draft = resolveDraft[id] || { count: '', note: '' };
+            button.disabled = true;
+            try {
+              await api.resolveDownloadLimitRequest(id, false, undefined, draft.note || undefined);
+              showMessage(messageEl, 'Request denied');
+              await refresh();
+            } catch (err) {
+              showMessage(messageEl, err.message, true);
+            } finally {
+              button.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function refresh() {
+        var results = await Promise.all([
+          api.getDownloadLimitPolicy(),
+          api.listDownloadLimitUsers(),
+          api.listDownloadLimitRequests(),
+        ]);
+        document.getElementById('default-max').value = String(results[0].defaultDownloadLimitMax);
+        document.getElementById('default-period').value = results[0].defaultDownloadLimitPeriod;
+        renderUsers(results[1]);
+        renderRequests(results[2]);
+      }
+
+      document.getElementById('policy-form').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var button = document.getElementById('policy-btn');
+        button.disabled = true;
+        try {
+          await api.updateDownloadLimitPolicy({
+            defaultDownloadLimitMax: Math.max(0, Number(document.getElementById('default-max').value) || 0),
+            defaultDownloadLimitPeriod: document.getElementById('default-period').value,
+          });
+          showMessage(messageEl, 'Default download limit saved');
+          await refresh();
+        } catch (err) {
+          showMessage(messageEl, err.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      refresh().catch(function (err) {
+        showMessage(messageEl, err.message, true);
+      });
+    });
+  </script>
+</body>
+</html>

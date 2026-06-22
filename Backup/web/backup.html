@@ -28,15 +28,31 @@
 
       <div class="settings-section">
         <h2>Stored backups</h2>
+        <p class="meta">CherryBox scans the backup folder for valid <code>.box</code> files each time this list loads. You can copy archives into the folder manually, then click Refresh.</p>
+        <div class="backup-section-toolbar">
+          <button type="button" class="secondary" id="refresh-backups-btn">Refresh list</button>
+        </div>
         <div id="backups"></div>
       </div>
 
       <div class="settings-section">
+        <h2>Import backup</h2>
+        <p class="meta">Upload a <code>.box</code> file from another CherryBox server and save it in stored backups.</p>
+        <div class="form-row backup-upload-row">
+          <label for="import-file">Backup file</label>
+          <input id="import-file" type="file" accept=".box,application/zip,application/octet-stream" />
+          <button type="button" class="secondary" id="import-btn">Upload backup</button>
+        </div>
+        <p class="meta" id="import-status" hidden></p>
+      </div>
+
+      <div class="settings-section">
         <h2>Restore from file</h2>
-        <p class="meta">Upload a <code>.box</code> backup created on this or another CherryBox server.</p>
-        <div class="form-row">
+        <p class="meta">Upload a <code>.box</code> backup and apply it immediately. This replaces current settings and databases.</p>
+        <div class="form-row backup-upload-row">
           <label for="restore-file">Backup file</label>
           <input id="restore-file" type="file" accept=".box,application/zip,application/octet-stream" />
+          <button type="button" class="secondary" id="restore-upload-btn">Restore now</button>
         </div>
         <p class="meta" id="restore-status" hidden></p>
       </div>
@@ -86,6 +102,12 @@
             var actionBusy = null;
             var backupFolderBrowser = null;
             var backupFolderRelative = '';
+            var importFileInput = document.getElementById('import-file');
+            var restoreFileInput = document.getElementById('restore-file');
+
+            function selectedFile(input) {
+              return input && input.files && input.files[0] ? input.files[0] : null;
+            }
 
             function renderBackups(backups) {
               var el = document.getElementById('backups');
@@ -119,21 +141,21 @@
                       '</div>' +
                       '<div class="settings-actions">' +
                       '<button type="button" class="secondary" data-download="' +
-                      backup.id +
+                      escapeHtml(backup.id) +
                       '" data-name="' +
                       escapeHtml(backup.fileName) +
                       '">' +
                       (actionBusy === 'download:' + backup.id ? '…' : 'Download') +
                       '</button>' +
                       '<button type="button" class="secondary" data-restore="' +
-                      backup.id +
+                      escapeHtml(backup.id) +
                       '" data-name="' +
                       escapeHtml(backup.fileName) +
                       '">' +
                       (actionBusy === 'restore:' + backup.id ? 'Restoring…' : 'Restore') +
                       '</button>' +
                       '<button type="button" class="secondary danger" data-delete="' +
-                      backup.id +
+                      escapeHtml(backup.id) +
                       '" data-name="' +
                       escapeHtml(backup.fileName) +
                       '">' +
@@ -247,9 +269,21 @@
               }
             }
 
+            document.getElementById('refresh-backups-btn').addEventListener('click', async function () {
+              var button = document.getElementById('refresh-backups-btn');
+              button.disabled = true;
+              try {
+                await refresh();
+                showMessage(messageEl, 'Backup list refreshed');
+              } catch (err) {
+                showMessage(messageEl, err.message, true);
+              } finally {
+                button.disabled = false;
+              }
+            });
+
             document.getElementById('create-btn').addEventListener('click', async function () {
               var button = document.getElementById('create-btn');
-              button.disabled = true;
               try {
                 var info = await api.createBackup();
                 showMessage(messageEl, 'Created backup ' + info.fileName);
@@ -285,17 +319,55 @@
               }
             });
 
-            document.getElementById('restore-file').addEventListener('change', async function (event) {
-              var input = event.currentTarget;
-              var file = input.files && input.files[0];
-              input.value = '';
-              if (!file) return;
+            document.getElementById('import-btn').addEventListener('click', async function () {
+              var file = selectedFile(importFileInput);
+              if (!file) {
+                showMessage(messageEl, 'Choose a .box backup file to upload.', true);
+                return;
+              }
 
+              var button = document.getElementById('import-btn');
+              var statusEl = document.getElementById('import-status');
+              button.disabled = true;
+              statusEl.hidden = false;
+              statusEl.textContent = 'Uploading…';
+              try {
+                var info = await api.importBackupUpload(file);
+                importFileInput.value = '';
+                showMessage(messageEl, 'Imported backup ' + info.fileName);
+                await refresh();
+              } catch (err) {
+                showMessage(messageEl, err.message, true);
+              } finally {
+                button.disabled = false;
+                statusEl.hidden = true;
+              }
+            });
+
+            document.getElementById('restore-upload-btn').addEventListener('click', async function () {
+              var file = selectedFile(restoreFileInput);
+              if (!file) {
+                showMessage(messageEl, 'Choose a .box backup file to restore.', true);
+                return;
+              }
+
+              if (
+                !window.confirm(
+                  'Restore settings and databases from ' +
+                    file.name +
+                    '?\n\nThis replaces current CherryBox data on this server.'
+                )
+              )
+                return;
+
+              var button = document.getElementById('restore-upload-btn');
               var statusEl = document.getElementById('restore-status');
+              button.disabled = true;
               statusEl.hidden = false;
               statusEl.textContent = 'Restoring…';
               try {
                 var result = await api.restoreBackupUpload(file);
+                restoreFileInput.value = '';
                 showMessage(messageEl, result.message ?? 'Restore completed');
                 if (result.restartRecommended)
                   showMessage(
@@ -307,6 +379,7 @@
               } catch (err) {
                 showMessage(messageEl, err.message, true);
               } finally {
+                button.disabled = false;
                 statusEl.hidden = true;
               }
             });

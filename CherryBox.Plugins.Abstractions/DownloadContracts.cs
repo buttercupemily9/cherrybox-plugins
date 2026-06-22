@@ -18,6 +18,22 @@ public sealed record DownloadJobDto(
     DateTimeOffset? RetryAfterAt,
     int RetryCount);
 
+public sealed record AdminDownloadJobDto(
+    Guid Id,
+    string Url,
+    DownloadJobStatus Status,
+    string? OutputPath,
+    string? ErrorMessage,
+    string? BlockReason,
+    Guid? ExistingMediaItemId,
+    string? ExistingMediaTitle,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? RetryAfterAt,
+    int RetryCount,
+    Guid? CreatedByUserId,
+    string? CreatedByUsername);
+
 public sealed record EnqueueDownloadResult(
     bool Accepted,
     DownloadJobDto? Job,
@@ -29,12 +45,75 @@ public sealed record DownloadSettingsDto(
     bool AllowNonAdminUsers,
     bool AutoRetryFailedDownloads,
     int AutoRetryDelayMinutes,
-    string HistoryDatabaseFileName);
+    string HistoryDatabaseFileName,
+    int DefaultDownloadLimitMax,
+    DownloadLimitPeriod DefaultDownloadLimitPeriod);
 
 public sealed record UpdateDownloadSettingsRequest(
     bool AllowNonAdminUsers,
     bool AutoRetryFailedDownloads,
-    int AutoRetryDelayMinutes);
+    int AutoRetryDelayMinutes,
+    int? DefaultDownloadLimitMax = null,
+    DownloadLimitPeriod? DefaultDownloadLimitPeriod = null);
+
+public sealed record DownloadLimitUsageDto(
+    bool IsLimited,
+    int LimitMax,
+    DownloadLimitPeriod Period,
+    int UsedCount,
+    int InFlightCount,
+    int BonusCount,
+    int RemainingCount,
+    DateTimeOffset PeriodStart,
+    DateTimeOffset PeriodResetsAt,
+    bool HasPendingRequest);
+
+public sealed record DownloadLimitPolicyDto(
+    int DefaultDownloadLimitMax,
+    DownloadLimitPeriod DefaultDownloadLimitPeriod);
+
+public sealed record UpdateDownloadLimitPolicyRequest(
+    int DefaultDownloadLimitMax,
+    DownloadLimitPeriod DefaultDownloadLimitPeriod);
+
+public sealed record DownloadLimitUserDto(
+    Guid Id,
+    string Username,
+    UserRole Role,
+    int? DownloadLimitMax,
+    DownloadLimitPeriod? DownloadLimitPeriod,
+    int EffectiveLimitMax,
+    DownloadLimitPeriod EffectivePeriod,
+    int UsedCount,
+    int InFlightCount,
+    int BonusCount,
+    int RemainingCount);
+
+public sealed record UpdateDownloadLimitUserRequest(
+    int? DownloadLimitMax,
+    DownloadLimitPeriod? DownloadLimitPeriod,
+    bool UseDefaultLimit = false);
+
+public sealed record DownloadLimitRequestDto(
+    Guid Id,
+    Guid UserId,
+    string Username,
+    int? RequestedCount,
+    string? Message,
+    ViewTimeRequestStatus Status,
+    int? GrantedCount,
+    string? AdminNote,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ResolvedAt);
+
+public sealed record CreateDownloadLimitRequestRequest(
+    int? RequestedCount,
+    string? Message);
+
+public sealed record ResolveDownloadLimitRequestRequest(
+    bool Approve,
+    int? GrantedCount,
+    string? AdminNote);
 
 public sealed record DownloadSiteAuthDto(
     string SiteKey,
@@ -74,11 +153,13 @@ public sealed record DownloadHistoryEntry(
 public interface IDownloadService
 {
     Task<EnqueueDownloadResult> EnqueueAsync(DownloadRequest request, Guid? userId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<DownloadJobDto>> ListAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<DownloadJobDto>> ListActiveAsync(CancellationToken cancellationToken = default);
-    Task<DownloadJobDto?> GetAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<DownloadJobDto?> RetryAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<DownloadJobDto?> CancelAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DownloadJobDto>> ListAsync(Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DownloadJobDto>> ListActiveAsync(Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<int> CountActiveAsync(Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<DownloadJobDto?> GetAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<DownloadJobDto?> RetryAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<DownloadJobDto?> CancelAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AdminDownloadJobDto>> ListAllAsync(CancellationToken cancellationToken = default);
     Task<DownloadSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task<DownloadSettingsDto> UpdateSettingsAsync(UpdateDownloadSettingsRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DownloadHistoryEntry>> ListHistoryAsync(CancellationToken cancellationToken = default);
@@ -87,4 +168,17 @@ public interface IDownloadService
     Task RemoveSiteAuthAsync(string siteKey, CancellationToken cancellationToken = default);
     Task<TestDownloadSiteAuthResult> TestSiteAuthAsync(TestDownloadSiteAuthRequest request, CancellationToken cancellationToken = default);
     Task<DownloadSiteAuthDto> UploadSiteCookiesAsync(string siteKey, Stream cookiesFile, CancellationToken cancellationToken = default);
+}
+
+public interface IDownloadLimitService
+{
+    Task<DownloadLimitUsageDto?> GetUsageAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<(bool Allowed, string? BlockReason)> CanEnqueueAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<DownloadLimitRequestDto?> CreateRequestAsync(Guid userId, CreateDownloadLimitRequestRequest request, CancellationToken cancellationToken = default);
+    Task<DownloadLimitPolicyDto> GetPolicyAsync(CancellationToken cancellationToken = default);
+    Task<DownloadLimitPolicyDto> UpdatePolicyAsync(UpdateDownloadLimitPolicyRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DownloadLimitUserDto>> ListUsersAsync(CancellationToken cancellationToken = default);
+    Task<DownloadLimitUserDto?> UpdateUserAsync(Guid userId, UpdateDownloadLimitUserRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DownloadLimitRequestDto>> ListRequestsAsync(CancellationToken cancellationToken = default);
+    Task<DownloadLimitRequestDto?> ResolveRequestAsync(Guid id, Guid adminUserId, ResolveDownloadLimitRequestRequest request, CancellationToken cancellationToken = default);
 }

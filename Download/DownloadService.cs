@@ -22,19 +22,22 @@ public sealed class DownloadService : IDownloadService
     private readonly IConfigManager _config;
     private readonly IDownloadJobTracker _jobTracker;
     private readonly IPlatformPaths _paths;
+    private readonly IDownloadLimitService _limits;
 
     public DownloadService(
         CherryBoxDbContext db,
         IDownloadHistoryStore history,
         IConfigManager config,
         IDownloadJobTracker jobTracker,
-        IPlatformPaths paths)
+        IPlatformPaths paths,
+        IDownloadLimitService limits)
     {
         _db = db;
         _history = history;
         _config = config;
         _jobTracker = jobTracker;
         _paths = paths;
+        _limits = limits;
     }
 
     public async Task<EnqueueDownloadResult> EnqueueAsync(
@@ -80,6 +83,23 @@ public sealed class DownloadService : IDownloadService
                 cancellationToken);
         }
 
+        if (userId.HasValue)
+        {
+            var (allowed, blockReason) = await _limits.CanEnqueueAsync(userId.Value, cancellationToken);
+            if (!allowed)
+            {
+                return await CreateBlockedResultAsync(
+                    url,
+                    normalized,
+                    request.TargetFolderId,
+                    userId,
+                    blockReason ?? "Download limit reached.",
+                    null,
+                    null,
+                    cancellationToken);
+            }
+        }
+
         var job = new DownloadJob
         {
             Url = url,
@@ -93,35 +113,54 @@ public sealed class DownloadService : IDownloadService
         return new EnqueueDownloadResult(true, await ToDtoAsync(job, cancellationToken), null, null, null);
     }
 
-    public async Task<IReadOnlyList<DownloadJobDto>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DownloadJobDto>> ListAsync(
+        Guid? forUserId = null,
+        CancellationToken cancellationToken = default)
     {
-        var jobs = await _db.DownloadJobs.ToListAsync(cancellationToken);
-        var dtos = new List<DownloadJobDto>();
-        foreach (var job in jobs.OrderByDescending(j => j.CreatedAt))
-            dtos.Add(await ToDtoAsync(job, cancellationToken));
-        return dtos;
-    }
-
-    public async Task<IReadOnlyList<DownloadJobDto>> ListActiveAsync(CancellationToken cancellationToken = default)
-    {
-        var jobs = await _db.DownloadJobs
-            .Where(j => j.Status == DownloadJobStatus.Pending || j.Status == DownloadJobStatus.Running)
+        var jobs = await ApplyUserScope(_db.DownloadJobs, forUserId)
+            .OrderByDescending(j => j.CreatedAt)
             .ToListAsync(cancellationToken);
         var dtos = new List<DownloadJobDto>();
-        foreach (var job in jobs.OrderBy(j => j.CreatedAt))
+        foreach (var job in jobs)
             dtos.Add(await ToDtoAsync(job, cancellationToken));
         return dtos;
     }
 
-    public async Task<DownloadJobDto?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DownloadJobDto>> ListActiveAsync(
+        Guid? forUserId = null,
+        CancellationToken cancellationToken = default)
     {
-        var job = await _db.DownloadJobs.FindAsync([id], cancellationToken);
+        var jobs = await ApplyUserScope(_db.DownloadJobs, forUserId)
+            .Where(j => j.Status == DownloadJobStatus.Pending || j.Status == DownloadJobStatus.Running)
+            .OrderBy(j => j.CreatedAt)
+            .ToListAsync(cancellationToken);
+        var dtos = new List<DownloadJobDto>();
+        foreach (var job in jobs)
+            dtos.Add(await ToDtoAsync(job, cancellationToken));
+        return dtos;
+    }
+
+    public Task<int> CountActiveAsync(Guid? forUserId = null, CancellationToken cancellationToken = default) =>
+        ApplyUserScope(_db.DownloadJobs, forUserId)
+            .CountAsync(
+                j => j.Status == DownloadJobStatus.Pending || j.Status == DownloadJobStatus.Running,
+                cancellationToken);
+
+    public async Task<DownloadJobDto?> GetAsync(
+        Guid id,
+        Guid? forUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var job = await FindOwnedJobAsync(id, forUserId, cancellationToken);
         return job is null ? null : await ToDtoAsync(job, cancellationToken);
     }
 
-    public async Task<DownloadJobDto?> RetryAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<DownloadJobDto?> RetryAsync(
+        Guid id,
+        Guid? forUserId = null,
+        CancellationToken cancellationToken = default)
     {
-        var job = await _db.DownloadJobs.FindAsync([id], cancellationToken);
+        var job = await FindOwnedJobAsync(id, forUserId, cancellationToken);
         if (job is null)
             return null;
 
@@ -140,9 +179,12 @@ public sealed class DownloadService : IDownloadService
         return await ToDtoAsync(job, cancellationToken);
     }
 
-    public async Task<DownloadJobDto?> CancelAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<DownloadJobDto?> CancelAsync(
+        Guid id,
+        Guid? forUserId = null,
+        CancellationToken cancellationToken = default)
     {
-        var job = await _db.DownloadJobs.FindAsync([id], cancellationToken);
+        var job = await FindOwnedJobAsync(id, forUserId, cancellationToken);
         if (job is null)
             return null;
 
@@ -159,6 +201,30 @@ public sealed class DownloadService : IDownloadService
         return await ToDtoAsync(job, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<AdminDownloadJobDto>> ListAllAsync(CancellationToken cancellationToken = default)
+    {
+        var jobs = await _db.DownloadJobs
+            .OrderByDescending(j => j.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var userIds = jobs
+            .Where(j => j.CreatedByUserId.HasValue)
+            .Select(j => j.CreatedByUserId!.Value)
+            .Distinct()
+            .ToList();
+
+        var usernames = userIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _db.Users.AsNoTracking()
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Username, cancellationToken);
+
+        var dtos = new List<AdminDownloadJobDto>();
+        foreach (var job in jobs)
+            dtos.Add(await ToAdminDtoAsync(job, usernames, cancellationToken));
+        return dtos;
+    }
+
     public Task<DownloadSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
         var download = _config.Current.Download;
@@ -166,7 +232,9 @@ public sealed class DownloadService : IDownloadService
             download.AllowNonAdminUsers,
             download.AutoRetryFailedDownloads,
             download.AutoRetryDelayMinutes,
-            download.HistoryDatabaseFileName));
+            download.HistoryDatabaseFileName,
+            download.DefaultDownloadLimitMax,
+            download.DefaultDownloadLimitPeriod));
     }
 
     public async Task<DownloadSettingsDto> UpdateSettingsAsync(
@@ -179,6 +247,10 @@ public sealed class DownloadService : IDownloadService
         _config.Current.Download.AllowNonAdminUsers = request.AllowNonAdminUsers;
         _config.Current.Download.AutoRetryFailedDownloads = request.AutoRetryFailedDownloads;
         _config.Current.Download.AutoRetryDelayMinutes = request.AutoRetryDelayMinutes;
+        if (request.DefaultDownloadLimitMax.HasValue)
+            _config.Current.Download.DefaultDownloadLimitMax = Math.Max(0, request.DefaultDownloadLimitMax.Value);
+        if (request.DefaultDownloadLimitPeriod.HasValue)
+            _config.Current.Download.DefaultDownloadLimitPeriod = request.DefaultDownloadLimitPeriod.Value;
         await _config.SaveAsync(cancellationToken);
         return await GetSettingsAsync(cancellationToken);
     }
@@ -348,14 +420,7 @@ public sealed class DownloadService : IDownloadService
 
     private async Task<Guid> ResolveTargetFolderIdAsync(Guid? folderId, CancellationToken cancellationToken)
     {
-        if (folderId.HasValue)
-        {
-            var folder = await _db.LibraryFolders.FindAsync([folderId.Value], cancellationToken);
-            if (folder is null)
-                throw new InvalidOperationException("Target library folder was not found.");
-            return folder.Id;
-        }
-
+        _ = folderId;
         return (await DownloadPaths.EnsureDefaultDownloadFolderAsync(_db, _paths, cancellationToken)).Id;
     }
 
@@ -470,6 +535,63 @@ public sealed class DownloadService : IDownloadService
             job.RetryAfterAt,
             job.RetryCount);
     }
+
+    private async Task<AdminDownloadJobDto> ToAdminDtoAsync(
+        DownloadJob job,
+        IReadOnlyDictionary<Guid, string> usernames,
+        CancellationToken cancellationToken)
+    {
+        string? existingTitle = null;
+        var mediaId = job.ExistingMediaItemId;
+        if (mediaId.HasValue)
+        {
+            var media = await _db.MediaItems.FindAsync([mediaId.Value], cancellationToken);
+            existingTitle = media?.Title ?? media?.FileName;
+        }
+
+        string? username = null;
+        if (job.CreatedByUserId is Guid userId && usernames.TryGetValue(userId, out var resolved))
+            username = resolved;
+
+        return new AdminDownloadJobDto(
+            job.Id,
+            job.Url,
+            job.Status,
+            job.OutputPath,
+            job.ErrorMessage,
+            job.BlockReason,
+            mediaId,
+            existingTitle,
+            job.CreatedAt,
+            job.UpdatedAt,
+            job.RetryAfterAt,
+            job.RetryCount,
+            job.CreatedByUserId,
+            username);
+    }
+
+    private static IQueryable<DownloadJob> ApplyUserScope(IQueryable<DownloadJob> query, Guid? forUserId)
+    {
+        if (!forUserId.HasValue)
+            return query;
+
+        return query.Where(j => j.CreatedByUserId == forUserId);
+    }
+
+    private async Task<DownloadJob?> FindOwnedJobAsync(
+        Guid id,
+        Guid? forUserId,
+        CancellationToken cancellationToken)
+    {
+        var job = await _db.DownloadJobs.FindAsync([id], cancellationToken);
+        if (job is null)
+            return null;
+
+        if (forUserId.HasValue && job.CreatedByUserId != forUserId)
+            return null;
+
+        return job;
+    }
 }
 
 public sealed class DownloadWorker
@@ -478,6 +600,7 @@ public sealed class DownloadWorker
     private readonly IPlatformPaths _paths;
     private readonly IConfigManager _configManager;
     private readonly IDownloadJobTracker _jobTracker;
+    private readonly YtDlpToolInstaller? _ytDlpInstaller;
     private readonly ILogger<DownloadWorker> _logger;
 
     public DownloadWorker(
@@ -485,12 +608,14 @@ public sealed class DownloadWorker
         IPlatformPaths paths,
         IConfigManager configManager,
         IDownloadJobTracker jobTracker,
+        YtDlpToolInstaller? ytDlpInstaller,
         ILogger<DownloadWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _paths = paths;
         _configManager = configManager;
         _jobTracker = jobTracker;
+        _ytDlpInstaller = ytDlpInstaller;
         _logger = logger;
     }
 
@@ -503,6 +628,7 @@ public sealed class DownloadWorker
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
                 await RequeueDueRetriesAsync(db, stoppingToken);
+                await RecoverInterruptedJobsAsync(db, stoppingToken);
 
                 var pending = await db.DownloadJobs
                     .Where(j => j.Status == DownloadJobStatus.Pending)
@@ -551,6 +677,32 @@ public sealed class DownloadWorker
             await db.SaveChangesAsync(stoppingToken);
     }
 
+    private async Task RecoverInterruptedJobsAsync(CherryBoxDbContext db, CancellationToken stoppingToken)
+    {
+        var running = await db.DownloadJobs
+            .Where(j => j.Status == DownloadJobStatus.Running)
+            .ToListAsync(stoppingToken);
+        if (running.Count == 0)
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+        var recovered = 0;
+        foreach (var job in running)
+        {
+            if (_jobTracker.IsTracked(job.Id))
+                continue;
+
+            job.Status = DownloadJobStatus.Pending;
+            job.ErrorMessage = null;
+            job.UpdatedAt = now;
+            recovered++;
+            _logger.LogWarning("Re-queued interrupted download {JobId}", job.Id);
+        }
+
+        if (recovered > 0)
+            await db.SaveChangesAsync(stoppingToken);
+    }
+
     private async Task ProcessJobAsync(
         IServiceScope scope,
         CherryBoxDbContext db,
@@ -570,6 +722,7 @@ public sealed class DownloadWorker
 
             job.OutputPath = outputPath;
             job.Status = DownloadJobStatus.Completed;
+            job.UpdatedAt = DateTimeOffset.UtcNow;
             job.MetadataJson = await TryLoadInfoJsonAsync(outputPath, stoppingToken);
             job.ErrorMessage = null;
             job.BlockReason = null;
@@ -639,8 +792,8 @@ public sealed class DownloadWorker
 
     private async Task<string> RunYtDlpAsync(DownloadJob job, CancellationToken cancellationToken)
     {
+        await EnsureYtDlpAvailableAsync(cancellationToken);
         var ytDlp = ResolveYtDlp();
-        EnsureYtDlpAvailable(ytDlp);
 
         var folderId = job.TargetFolderId;
         if (!folderId.HasValue)
@@ -740,6 +893,31 @@ public sealed class DownloadWorker
         var bundled = _paths.GetToolPath("yt-dlp");
         if (File.Exists(bundled)) return bundled;
         return OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp";
+    }
+
+    private async Task EnsureYtDlpAvailableAsync(CancellationToken cancellationToken)
+    {
+        var ytDlp = ResolveYtDlp();
+        if (File.Exists(ytDlp))
+            return;
+
+        if (_ytDlpInstaller is not null)
+        {
+            try
+            {
+                if (await _ytDlpInstaller.EnsureInstalledAsync(cancellationToken) &&
+                    File.Exists(ResolveYtDlp()))
+                {
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Automatic yt-dlp installation failed.");
+            }
+        }
+
+        EnsureYtDlpAvailable(ytDlp);
     }
 
     private static void EnsureYtDlpAvailable(string ytDlpPath)

@@ -24,10 +24,18 @@
 
     function render(downloads) {
       downloadsCache = downloads || [];
+      var activeCount = downloadsCache.filter(function (d) {
+        return d.status === 'Pending' || d.status === 'Running';
+      }).length;
+      if (typeof options.onActiveCountChange === 'function')
+        options.onActiveCountChange(activeCount);
+
       if (!downloadsCache.length) {
         container.innerHTML = '<p class="meta">' + escapeHtml(emptyText) + '</p>';
         return;
       }
+
+      var showUser = Boolean(options.showUser);
 
       container.innerHTML =
         '<ul class="download-list">' +
@@ -40,6 +48,11 @@
               '<span class="status">' +
               escapeHtml(STATUS_LABEL[d.status] ?? d.status) +
               '</span>' +
+              (showUser
+                ? '<span class="meta download-row__user">' +
+                  escapeHtml(d.createdByUsername || 'Unknown user') +
+                  '</span>'
+                : '') +
               '<a class="download-row__url" href="' +
               escapeHtml(d.url) +
               '" target="_blank" rel="noreferrer">' +
@@ -55,6 +68,9 @@
                 : '') +
               (d.retryAfterAt && d.status === 'Failed'
                 ? '<p class="meta">Auto-retry after ' + formatTime(d.retryAfterAt) + '</p>'
+                : '') +
+              (showUser && d.createdAt
+                ? '<p class="meta">Queued ' + formatTime(d.createdAt) + '</p>'
                 : '') +
               '</div>' +
               '<div class="download-row__actions">' +
@@ -83,13 +99,15 @@
           .join('') +
         '</ul>';
 
+      var retryDownload = options.retryDownload || api.retryDownload.bind(api);
+      var cancelDownload = options.cancelDownload || api.cancelDownload.bind(api);
+
       container.querySelectorAll('[data-retry]').forEach(function (button) {
         button.addEventListener('click', function () {
           var id = button.getAttribute('data-retry');
           retryBusy = id;
           render(downloadsCache);
-          api
-            .retryDownload(id)
+          retryDownload(id)
             .then(function () {
               if (messageEl) showMessage(messageEl, 'Download re-queued');
               return refresh();
@@ -108,8 +126,7 @@
           var id = button.getAttribute('data-cancel');
           cancelBusy = id;
           render(downloadsCache);
-          api
-            .cancelDownload(id)
+          cancelDownload(id)
             .then(function () {
               if (messageEl) showMessage(messageEl, 'Download cancelled');
               return refresh();
@@ -125,7 +142,8 @@
     }
 
     function refresh() {
-      return api.listDownloads().then(render);
+      var listDownloads = options.listDownloads || api.listDownloads.bind(api);
+      return listDownloads().then(render);
     }
 
     pollTimer = global.setInterval(function () {
