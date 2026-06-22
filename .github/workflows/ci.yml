@@ -2,9 +2,9 @@ name: Build and release plugins
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
   pull_request:
-    branches: [dev]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -82,7 +82,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish latest release
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/dev'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -99,5 +99,5 @@ jobs:
             Rolling plugin release for CherryBox **Settings → Store**.
 
             - Built from [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-            - Branch: `dev`
+            - Branch: `main`
             - Download pattern: `https://github.com/buttercupemily9/cherrybox-plugins/releases/latest/download/{plugin-id}.zip`

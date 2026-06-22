@@ -62,12 +62,12 @@ CherryBox **Settings → Store** always pulls the latest catalog and packages fr
 
 | Source | URL |
 |--------|-----|
-| Catalog | [`store.json` on `dev`](https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/dev/store.json) |
+| Catalog | [`store.json` on `main`](https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/store.json) |
 | Packages | [Latest GitHub release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) (`hello-cherrybox.zip`, `backup.zip`, …) |
 
 ## CI / releases
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `dev`:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main`:
 
 1. Checks out this repo (includes vendored `CherryBox.Plugins.Abstractions`)
 2. Builds all plugins
