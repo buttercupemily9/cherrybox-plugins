@@ -36,7 +36,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterScoped<IDownloadLimitService>(CreateDownloadLimitService);
         registry.RegisterScoped<IDownloadService>(sp =>
         {
-            var limits = registry.Resolve<IDownloadLimitService>(sp) ?? CreateDownloadLimitService(sp);
+            var limits = CreateDownloadLimitService(sp);
             return new DownloadService(
                 sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
                 history,
