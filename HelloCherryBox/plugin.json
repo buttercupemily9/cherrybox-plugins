@@ -2,6 +2,7 @@
   "id": "hello-cherrybox",
   "name": "Hello CherryBox",
   "version": "1.0.0",
+  "storeHidden": true,
   "entryAssembly": "HelloCherryBox.Plugin.dll",
   "entryType": "HelloCherryBox.Plugin.HelloPlugin",
   "mainTabs": [

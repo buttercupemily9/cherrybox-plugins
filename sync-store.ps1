@@ -20,6 +20,8 @@ Get-ChildItem -Path $root -Directory | ForEach-Object {
     if (-not (Test-Path $manifestPath)) { return }
 
     $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.storeHidden -eq $true) { return }
+
     $id = [string]$manifest.id
     $description = $null
     if ($existing.ContainsKey($id) -and $existing[$id].description) {

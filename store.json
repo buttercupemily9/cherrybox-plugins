@@ -1,18 +1,6 @@
 {
-  "catalogVersion": 6,
+  "catalogVersion": 7,
   "plugins": [
-    {
-      "id": "hello-cherrybox",
-      "folder": "HelloCherryBox",
-      "name": "Hello CherryBox",
-      "version": "1.0.0",
-      "description": "Sample plugin demonstrating the CherryBox plugin API.",
-      "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/HelloCherryBox",
-      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/HelloCherryBox/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Initial sample plugin release."
-    },
     {
       "id": "backup",
       "folder": "Backup",
