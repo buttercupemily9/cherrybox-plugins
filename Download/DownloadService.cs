@@ -117,9 +117,10 @@ public sealed class DownloadService : IDownloadService
         Guid? forUserId = null,
         CancellationToken cancellationToken = default)
     {
-        var jobs = await ApplyUserScope(_db.DownloadJobs, forUserId)
+        var jobs = (await ApplyUserScope(_db.DownloadJobs, forUserId)
+            .ToListAsync(cancellationToken))
             .OrderByDescending(j => j.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToList();
         var dtos = new List<DownloadJobDto>();
         foreach (var job in jobs)
             dtos.Add(await ToDtoAsync(job, cancellationToken));
@@ -130,10 +131,11 @@ public sealed class DownloadService : IDownloadService
         Guid? forUserId = null,
         CancellationToken cancellationToken = default)
     {
-        var jobs = await ApplyUserScope(_db.DownloadJobs, forUserId)
+        var jobs = (await ApplyUserScope(_db.DownloadJobs, forUserId)
             .Where(j => j.Status == DownloadJobStatus.Pending || j.Status == DownloadJobStatus.Running)
+            .ToListAsync(cancellationToken))
             .OrderBy(j => j.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToList();
         var dtos = new List<DownloadJobDto>();
         foreach (var job in jobs)
             dtos.Add(await ToDtoAsync(job, cancellationToken));
@@ -203,9 +205,10 @@ public sealed class DownloadService : IDownloadService
 
     public async Task<IReadOnlyList<AdminDownloadJobDto>> ListAllAsync(CancellationToken cancellationToken = default)
     {
-        var jobs = await _db.DownloadJobs
+        var jobs = (await _db.DownloadJobs
+            .ToListAsync(cancellationToken))
             .OrderByDescending(j => j.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         var userIds = jobs
             .Where(j => j.CreatedByUserId.HasValue)
