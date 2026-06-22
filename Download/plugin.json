@@ -15,6 +15,20 @@
   ],
   "settingsTabs": [
     {
+      "id": "accounts",
+      "label": "Accounts",
+      "icon": "users",
+      "page": "accounts.html",
+      "order": 88
+    },
+    {
+      "id": "all-queue",
+      "label": "All queues",
+      "icon": "download",
+      "page": "admin-queue.html",
+      "order": 89
+    },
+    {
       "id": "queue",
       "label": "Download settings",
       "icon": "queue",

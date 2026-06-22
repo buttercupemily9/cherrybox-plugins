@@ -43,16 +43,49 @@ async function downloadRequest(path, fileName) {
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || response.statusText);
+    let message = text || response.statusText;
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.error ?? parsed.detail ?? parsed.title ?? message;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(message);
   }
 
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = fileName;
+  link.download = fileName || 'backup.box';
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+async function uploadFormRequest(path, file) {
+  const token = getToken();
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    let message = text || response.statusText;
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.error ?? parsed.detail ?? parsed.title ?? message;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(message);
+  }
+  return text ? JSON.parse(text) : null;
 }
 
 const api = {
@@ -61,20 +94,8 @@ const api = {
   downloadBackup: (id, fileName) => downloadRequest(`/backups/${encodeURIComponent(id)}/download`, fileName),
   restoreBackup: (id) => apiRequest(`/backups/${encodeURIComponent(id)}/restore`, { method: 'POST' }),
   deleteBackup: (id) => apiRequest(`/backups/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  restoreBackupUpload: async (file) => {
-    const token = getToken();
-    const form = new FormData();
-    form.append('file', file);
-    const response = await fetch(`${API_BASE}/backups/restore`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    });
-    const text = await response.text();
-    if (!response.ok)
-      throw new Error(text || response.statusText);
-    return text ? JSON.parse(text) : null;
-  },
+  importBackupUpload: (file) => uploadFormRequest('/backups/import', file),
+  restoreBackupUpload: (file) => uploadFormRequest('/backups/restore', file),
   getBackupSettings: () => apiRequest('/settings/backup'),
   updateBackupSettings: (data) =>
     apiRequest('/settings/backup', { method: 'PUT', body: JSON.stringify(data) }),

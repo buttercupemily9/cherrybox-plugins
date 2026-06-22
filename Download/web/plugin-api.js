@@ -35,6 +35,10 @@ async function apiRequest(path, options = {}) {
 
 const api = {
   listDownloads: () => apiRequest('/downloads'),
+  getDownloadActiveCount: () => apiRequest('/downloads/active-count'),
+  listAdminDownloadQueue: () => apiRequest('/settings/downloads/queue'),
+  retryAdminDownload: (id) => apiRequest('/settings/downloads/queue/' + encodeURIComponent(id) + '/retry', { method: 'POST' }),
+  cancelAdminDownload: (id) => apiRequest('/settings/downloads/queue/' + encodeURIComponent(id) + '/cancel', { method: 'POST' }),
   listDownloadHistory: () => apiRequest('/downloads/history'),
   enqueueDownload: (url, targetFolderId) =>
     apiRequest('/downloads', {
@@ -81,6 +85,28 @@ const api = {
     return api.uploadSiteCookies(siteKey, file);
   },
   listFolders: () => apiRequest('/library/folders'),
+  getDownloadLimit: () => apiRequest('/downloads/limit'),
+  requestMoreDownloads: (data) =>
+    apiRequest('/downloads/limit/request', { method: 'POST', body: JSON.stringify(data) }),
+  getDownloadLimitPolicy: () => apiRequest('/settings/downloads/limit-policy'),
+  updateDownloadLimitPolicy: (data) =>
+    apiRequest('/settings/downloads/limit-policy', { method: 'PUT', body: JSON.stringify(data) }),
+  listDownloadLimitUsers: () => apiRequest('/settings/downloads/limit-users'),
+  updateDownloadLimitUser: (userId, data) =>
+    apiRequest('/settings/downloads/limit-users/' + encodeURIComponent(userId), {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  listDownloadLimitRequests: () => apiRequest('/settings/downloads/limit-requests'),
+  resolveDownloadLimitRequest: (id, approve, grantedCount, adminNote) =>
+    apiRequest('/settings/downloads/limit-requests/' + encodeURIComponent(id) + '/resolve', {
+      method: 'POST',
+      body: JSON.stringify({
+        approve: approve,
+        grantedCount: grantedCount ?? null,
+        adminNote: adminNote ?? null,
+      }),
+    }),
 };
 
 const STATUS_LABEL = {

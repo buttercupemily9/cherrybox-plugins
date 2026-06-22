@@ -33,12 +33,16 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterSingleton(jobTracker);
         registry.RegisterSingleton(history);
         registry.RegisterSingleton(ytDlpInstaller);
+        registry.RegisterScoped<IDownloadLimitService>(sp => new DownloadLimitService(
+            sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
+            sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>()));
         registry.RegisterScoped<IDownloadService>(sp => new DownloadService(
             sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
             history,
             sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
             jobTracker,
-            sp.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>()));
+            sp.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
+            sp.GetRequiredService<IDownloadLimitService>()));
         registry.RegisterSupportAppUpdater(ytDlpInstaller);
     }
 
@@ -51,13 +55,20 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         var jobTracker = registry.Resolve<DownloadJobTracker>(context.Services)!;
         var logger = context.Services.GetRequiredService<ILogger<DownloadWorker>>();
 
+        using (var scope = scopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CherryBox.Data.CherryBoxDbContext>();
+            await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, paths, cancellationToken);
+        }
+
         var ytDlp = registry.Resolve<YtDlpToolInstaller>(context.Services);
-        if (ytDlp is not null)
-            await ytDlp.EnsureInstalledAsync(cancellationToken);
 
         _workerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var worker = new DownloadWorker(scopeFactory, paths, config, jobTracker, logger);
+        var worker = new DownloadWorker(scopeFactory, paths, config, jobTracker, ytDlp, logger);
         _workerTask = worker.RunAsync(_workerCts.Token);
+
+        if (ytDlp is not null)
+            _ = EnsureYtDlpInBackgroundAsync(ytDlp, logger, _workerCts.Token);
 
         registry.RegisterStopCallback(async ct =>
         {
@@ -70,6 +81,21 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
             _workerCts = null;
             _workerTask = null;
         });
+    }
+
+    private static async Task EnsureYtDlpInBackgroundAsync(
+        YtDlpToolInstaller ytDlp,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ytDlp.EnsureInstalledAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Background yt-dlp installation failed; downloads will retry once yt-dlp is available.");
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)

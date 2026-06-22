@@ -1,116 +1,130 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Downloads</title>
-  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
-  <link rel="stylesheet" href="plugin-ui.css" />
-  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
-  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
-  <script src="plugin-api.js" defer></script>
-  <script src="downloads-queue.js" defer></script>
-</head>
-<body>
-  <div class="card download-page">
-    <h1>Downloads</h1>
-    <p class="meta">Queue URLs for yt-dlp. Already-downloaded URLs are blocked using the download history database.</p>
-    <div id="message" class="plugin-message" hidden></div>
-
-    <div class="settings-section">
-      <h2>Download queue</h2>
-      <div id="queue-panel"></div>
-    </div>
-
-    <div class="settings-section">
-      <h2>Add download</h2>
-      <form id="queue-form">
-        <div class="form-row">
-          <label for="url">URL</label>
-          <input id="url" name="url" placeholder="https://…" required />
-        </div>
-        <div class="form-row">
-          <label for="folder">Target folder</label>
-          <select id="folder" name="folder">
-            <option value="">Downloads library folder (default)</option>
-          </select>
-        </div>
-        <button type="submit" id="queue-btn">Queue download</button>
-      </form>
-    </div>
-  </div>
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      if (window.CherryBoxPluginApi) {
-        CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
-          console.warn('CherryBox plugin theme init failed', err);
-        });
-      }
-
-      var ui = window.DownloadPluginUi;
-      if (!ui) {
-        var messageEl = document.getElementById('message');
-        if (messageEl) {
-          messageEl.hidden = false;
-          messageEl.textContent = 'Download plugin UI failed to load.';
-          messageEl.className = 'plugin-message error';
-        }
-        return;
-      }
-
-      var api = ui.api;
-      var showMessage = ui.showMessage;
-      var messageEl = document.getElementById('message');
-      var queuePanel = window.DownloadQueuePanel.mount(
-        document.getElementById('queue-panel'),
-        messageEl,
-        api,
-        ui,
-        { emptyText: 'No downloads queued yet. Add a URL below to start.' }
-      );
-
-      async function loadFolders() {
-        var folders = await api.listFolders();
-        var select = document.getElementById('folder');
-        folders.forEach(function (folder) {
-          var option = document.createElement('option');
-          option.value = folder.id;
-          option.textContent = folder.displayName;
-          select.appendChild(option);
-        });
-      }
-
-      document.getElementById('queue-form').addEventListener('submit', async function (event) {
-        event.preventDefault();
-        var button = document.getElementById('queue-btn');
-        button.disabled = true;
-        try {
-          var url = document.getElementById('url').value.trim();
-          var folderId = document.getElementById('folder').value || undefined;
-          var result = await api.enqueueDownload(url, folderId);
-          if (!result.accepted) {
-            showMessage(messageEl, result.blockReason ?? 'Download blocked', true);
-          } else {
-            showMessage(messageEl, 'Download queued');
-            document.getElementById('url').value = '';
-          }
-          await queuePanel.refresh();
-        } catch (err) {
-          showMessage(messageEl, err.message, true);
-        } finally {
-          button.disabled = false;
-        }
-      });
-
-      Promise.all([loadFolders(), queuePanel.refresh()]).catch(function (err) {
-        showMessage(messageEl, err.message, true);
-      });
-
-      window.addEventListener('beforeunload', function () {
-        queuePanel.destroy();
-      });
-    });
-  </script>
-</body>
-</html>
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Downloads</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
+  <script src="downloads-queue.js" defer></script>
+</head>
+<body>
+  <div class="card download-page">
+    <h1>Downloads</h1>
+    <p class="meta">Queue URLs for yt-dlp. You only see downloads you queued on this account. Videos save to the Downloads library folder.</p>
+    <p class="meta" id="limit-summary" hidden></p>
+    <div id="message" class="plugin-message" hidden></div>
+
+    <div class="settings-section">
+      <h2 id="queue-heading">Download queue</h2>
+      <div id="queue-panel"></div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Add download</h2>
+      <form id="queue-form">
+        <div class="form-row">
+          <label for="url">URL</label>
+          <input id="url" name="url" placeholder="https://…" required />
+        </div>
+        <button type="submit" id="queue-btn">Queue download</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.CherryBoxPluginApi) {
+        CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+          console.warn('CherryBox plugin theme init failed', err);
+        });
+      }
+
+      var ui = window.DownloadPluginUi;
+      if (!ui) {
+        var messageEl = document.getElementById('message');
+        if (messageEl) {
+          messageEl.hidden = false;
+          messageEl.textContent = 'Download plugin UI failed to load.';
+          messageEl.className = 'plugin-message error';
+        }
+        return;
+      }
+
+      var api = ui.api;
+      var showMessage = ui.showMessage;
+      var messageEl = document.getElementById('message');
+      var queuePanel = window.DownloadQueuePanel.mount(
+        document.getElementById('queue-panel'),
+        messageEl,
+        api,
+        ui,
+        {
+          emptyText: 'No downloads queued yet. Add a URL below to start.',
+          onActiveCountChange: function (count) {
+            var heading = document.getElementById('queue-heading');
+            if (!heading) return;
+            heading.textContent = count > 0
+              ? 'Download queue (' + count + ')'
+              : 'Download queue';
+          },
+        }
+      );
+
+      var PERIOD_LABELS = { Hour: 'hour', Day: 'day', Week: 'week', Month: 'month', Year: 'year' };
+
+      async function loadLimitSummary() {
+        var summaryEl = document.getElementById('limit-summary');
+        if (!summaryEl || !api.getDownloadLimit) return;
+        try {
+          var usage = await api.getDownloadLimit();
+          if (!usage || !usage.isLimited) {
+            summaryEl.hidden = true;
+            return;
+          }
+          var period = PERIOD_LABELS[usage.period] || usage.period.toLowerCase();
+          var total = usage.limitMax + usage.bonusCount;
+          var used = usage.usedCount + usage.inFlightCount;
+          summaryEl.textContent =
+            used + '/' + total + ' downloads used this ' + period + '. Resets ' + new Date(usage.periodResetsAt).toLocaleString() + '.';
+          summaryEl.hidden = false;
+        } catch {
+          summaryEl.hidden = true;
+        }
+      }
+
+      document.getElementById('queue-form').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var button = document.getElementById('queue-btn');
+        button.disabled = true;
+        try {
+          var url = document.getElementById('url').value.trim();
+          var result = await api.enqueueDownload(url);
+          if (!result.accepted) {
+            showMessage(messageEl, result.blockReason ?? 'Download blocked', true);
+          } else {
+            showMessage(messageEl, 'Download queued');
+            document.getElementById('url').value = '';
+          }
+          await Promise.all([queuePanel.refresh(), loadLimitSummary()]);
+        } catch (err) {
+          showMessage(messageEl, err.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      Promise.all([loadLimitSummary(), queuePanel.refresh()]).catch(function (err) {
+        showMessage(messageEl, err.message, true);
+      });
+
+      window.addEventListener('beforeunload', function () {
+        queuePanel.destroy();
+      });
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>All download queues</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
+  <script src="downloads-queue.js" defer></script>
+</head>
+<body>
+  <div class="card download-page">
+    <h1>All download queues</h1>
+    <p class="meta">Every user&apos;s download jobs across the server. Retry or cancel any item.</p>
+    <div id="message" class="plugin-message" hidden></div>
+
+    <div class="settings-section">
+      <h2 id="queue-heading">Server queue</h2>
+      <div id="queue-panel"></div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.CherryBoxPluginApi) {
+        CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+          console.warn('CherryBox plugin theme init failed', err);
+        });
+      }
+
+      var ui = window.DownloadPluginUi;
+      if (!ui) {
+        var messageEl = document.getElementById('message');
+        if (messageEl) {
+          messageEl.hidden = false;
+          messageEl.textContent = 'Download plugin UI failed to load.';
+          messageEl.className = 'plugin-message error';
+        }
+        return;
+      }
+
+      var api = ui.api;
+      var showMessage = ui.showMessage;
+      var messageEl = document.getElementById('message');
+      var queuePanel = window.DownloadQueuePanel.mount(
+        document.getElementById('queue-panel'),
+        messageEl,
+        api,
+        ui,
+        {
+          emptyText: 'No downloads on the server yet.',
+          showUser: true,
+          listDownloads: function () {
+            return api.listAdminDownloadQueue();
+          },
+          retryDownload: function (id) {
+            return api.retryAdminDownload(id);
+          },
+          cancelDownload: function (id) {
+            return api.cancelAdminDownload(id);
+          },
+          onActiveCountChange: function (count) {
+            var heading = document.getElementById('queue-heading');
+            if (!heading) return;
+            heading.textContent = count > 0
+              ? 'Server queue (' + count + ' active)'
+              : 'Server queue';
+          },
+        }
+      );
+
+      queuePanel.refresh().catch(function (err) {
+        showMessage(messageEl, err.message, true);
+      });
+
+      window.addEventListener('beforeunload', function () {
+        queuePanel.destroy();
+      });
+    });
+  </script>
+</body>
+</html>
