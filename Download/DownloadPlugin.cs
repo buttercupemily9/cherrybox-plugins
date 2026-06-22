@@ -33,18 +33,25 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterSingleton(jobTracker);
         registry.RegisterSingleton(history);
         registry.RegisterSingleton(ytDlpInstaller);
-        registry.RegisterScoped<IDownloadLimitService>(sp => new DownloadLimitService(
-            sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
-            sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>()));
-        registry.RegisterScoped<IDownloadService>(sp => new DownloadService(
-            sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
-            history,
-            sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
-            jobTracker,
-            sp.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
-            registry.Resolve<IDownloadLimitService>(sp)!));
+        registry.RegisterScoped<IDownloadLimitService>(CreateDownloadLimitService);
+        registry.RegisterScoped<IDownloadService>(sp =>
+        {
+            var limits = registry.Resolve<IDownloadLimitService>(sp) ?? CreateDownloadLimitService(sp);
+            return new DownloadService(
+                sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
+                history,
+                sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
+                jobTracker,
+                sp.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
+                limits);
+        });
         registry.RegisterSupportAppUpdater(ytDlpInstaller);
     }
+
+    private static DownloadLimitService CreateDownloadLimitService(IServiceProvider sp) =>
+        new(
+            sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
+            sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>());
 
     public async Task StartAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
@@ -53,6 +60,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         var paths = context.Services.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>();
         var config = context.Services.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>();
         var jobTracker = registry.Resolve<DownloadJobTracker>(context.Services)!;
+        var history = registry.Resolve<DownloadHistoryStore>(context.Services)!;
         var logger = context.Services.GetRequiredService<ILogger<DownloadWorker>>();
 
         using (var scope = scopeFactory.CreateScope())
@@ -64,7 +72,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         var ytDlp = registry.Resolve<YtDlpToolInstaller>(context.Services);
 
         _workerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var worker = new DownloadWorker(scopeFactory, paths, config, jobTracker, ytDlp, logger);
+        var worker = new DownloadWorker(scopeFactory, paths, config, jobTracker, history, ytDlp, logger);
         _workerTask = worker.RunAsync(_workerCts.Token);
 
         if (ytDlp is not null)

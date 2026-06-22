@@ -600,6 +600,7 @@ public sealed class DownloadWorker
     private readonly IPlatformPaths _paths;
     private readonly IConfigManager _configManager;
     private readonly IDownloadJobTracker _jobTracker;
+    private readonly IDownloadHistoryStore _history;
     private readonly YtDlpToolInstaller? _ytDlpInstaller;
     private readonly ILogger<DownloadWorker> _logger;
 
@@ -608,6 +609,7 @@ public sealed class DownloadWorker
         IPlatformPaths paths,
         IConfigManager configManager,
         IDownloadJobTracker jobTracker,
+        IDownloadHistoryStore history,
         YtDlpToolInstaller? ytDlpInstaller,
         ILogger<DownloadWorker> logger)
     {
@@ -615,6 +617,7 @@ public sealed class DownloadWorker
         _paths = paths;
         _configManager = configManager;
         _jobTracker = jobTracker;
+        _history = history;
         _ytDlpInstaller = ytDlpInstaller;
         _logger = logger;
     }
@@ -743,7 +746,6 @@ public sealed class DownloadWorker
             var metadata = scope.ServiceProvider.GetRequiredService<StashBoxMetadataService>();
             var encoder = scope.ServiceProvider.GetRequiredService<IMediaEncoder>();
             var fingerprints = scope.ServiceProvider.GetRequiredService<IVideoFingerprintService>();
-            var history = scope.ServiceProvider.GetRequiredService<IDownloadHistoryStore>();
 
             var probe = await encoder.ProbeAsync(outputPath, stoppingToken);
             var computed = await fingerprints.ComputeAsync(outputPath, probe?.DurationSeconds, stoppingToken);
@@ -762,7 +764,7 @@ public sealed class DownloadWorker
                 m => m.FilePath == outputPath,
                 stoppingToken);
             var title = TryExtractTitle(job.MetadataJson) ?? Path.GetFileNameWithoutExtension(outputPath);
-            await history.RecordAsync(
+            await _history.RecordAsync(
                 job.NormalizedUrl,
                 job.Url,
                 title,
