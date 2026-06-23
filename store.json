@@ -101,13 +101,13 @@
       "id": "transcoder",
       "folder": "Transcoder",
       "name": "Media transcoder",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Standardize video files in-place with configurable profiles, library assignments, and a 24/7 background transcode queue.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Transcoder",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with profiles, assignments, queue worker, and batch transcode task."
+      "changelog": "Fix TranscodeApi load order on plugin settings pages."
     }
   ]
 }
