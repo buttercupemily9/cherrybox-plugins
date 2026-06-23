@@ -138,4 +138,20 @@ function showMessage(el, text, isError = false) {
   el.hidden = !text;
 }
 
-window.DownloadPluginUi = { api, STATUS_LABEL, formatTime, escapeHtml, showMessage };
+function shortUrl(url) {
+  try {
+    var parsed = new URL(url);
+    var path = parsed.pathname.length > 42 ? parsed.pathname.slice(0, 39) + '…' : parsed.pathname;
+    return parsed.hostname + path;
+  } catch {
+    return url.length > 48 ? url.slice(0, 45) + '…' : url;
+  }
+}
+
+function downloadCoverUrl(jobId) {
+  var url = API_BASE + '/downloads/' + encodeURIComponent(jobId) + '/cover';
+  var token = getToken();
+  return token ? url + '?access_token=' + encodeURIComponent(token) : url;
+}
+
+window.DownloadPluginUi = { api, STATUS_LABEL, formatTime, escapeHtml, showMessage, downloadCoverUrl, shortUrl };

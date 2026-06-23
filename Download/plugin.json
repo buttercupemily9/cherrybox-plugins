@@ -1,7 +1,7 @@
 {
   "id": "download",
   "name": "Video downloader",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "entryAssembly": "Download.Plugin.dll",
   "entryType": "CherryBox.Download.Plugin.DownloadPlugin",
   "mainTabs": [

@@ -1,0 +1,8 @@
+{
+  "id": "image-download",
+  "name": "Image downloader",
+  "version": "1.0.0",
+  "entryAssembly": "ImageDownload.Plugin.dll",
+  "entryType": "ImageDownload.Plugin.ImageDownloadPlugin",
+  "description": "Download images and galleries from supported sites into Pictures or Galleries libraries."
+}
