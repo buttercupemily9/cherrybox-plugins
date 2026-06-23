@@ -77,30 +77,8 @@ public sealed class ImagefapHandler : IImageDownloadHandler
 
     public bool CanHandle(Uri url) => SiteHostMatcher.HostEndsWith(url, "imagefap.com");
 
-    public async Task<ImageDownloadPlan?> BuildPlanAsync(string url, CancellationToken cancellationToken = default)
-    {
-        var pageUri = SiteHostMatcher.NormalizeUrl(url);
-        var html = await ImageFetchHelper.GetStringAsync(pageUri.ToString(), cancellationToken);
-        var doc = new HtmlDocument();
-        doc.LoadHtml(html);
-
-        var urls = HtmlGalleryScraper.CollectImageUrls(
-            doc,
-            pageUri,
-            "//a[contains(@href,'/photo/')]",
-            "//img[contains(@class,'photo')]",
-            "//img[@id='photo']");
-
-        if (urls.Count == 0)
-            return YtDlpPlanHelper.BuildYtDlpPlan(url, SiteName);
-
-        return new ImageDownloadPlan(
-            HtmlGalleryScraper.PageTitle(doc) ?? SiteName,
-            url,
-            SiteName,
-            ImageDownloadExecutionMode.DirectHttp,
-            urls.Select(u => new ImageDownloadItem(u)).ToList());
-    }
+    public Task<ImageDownloadPlan?> BuildPlanAsync(string url, CancellationToken cancellationToken = default) =>
+        ImageFapHelper.BuildPlanAsync(url, cancellationToken);
 }
 
 public sealed class SexComHandler : HtmlImageDownloadHandlerBase

@@ -128,54 +128,63 @@
 
 
 
+      var historyCache = [];
+
       function renderHistory(history) {
-
+        historyCache = history || [];
         var el = document.getElementById('history');
-
-        if (!history.length) {
-
+        if (!historyCache.length) {
           el.innerHTML = '<p class="meta">No download history yet.</p>';
-
           return;
-
         }
 
-
-
         el.innerHTML =
-
           '<ul class="settings-list">' +
-
-          history
-
-            .map(function (entry) {
-
+          historyCache
+            .map(function (entry, index) {
+              var statusLabel = entry.failed ? 'Failed' : 'Downloaded';
               return (
-
                 '<li class="settings-list__row">' +
-
+                '<div class="settings-list__row-main">' +
                 '<strong>' +
-
                 escapeHtml(entry.title ?? entry.originalUrl) +
-
                 '</strong>' +
-
                 '<p class="meta">' +
-
+                statusLabel +
+                ' · ' +
                 formatTime(entry.downloadedAt) +
-
                 '</p>' +
-
+                (entry.errorMessage
+                  ? '<p class="error">' + escapeHtml(entry.errorMessage) + '</p>'
+                  : '') +
+                '</div>' +
+                '<button type="button" class="secondary" data-delete-history-index="' +
+                index +
+                '">Delete</button>' +
                 '</li>'
-
               );
-
             })
-
             .join('') +
-
           '</ul>';
 
+        el.querySelectorAll('[data-delete-history-index]').forEach(function (button) {
+          button.addEventListener('click', function () {
+            var index = Number(button.getAttribute('data-delete-history-index'));
+            var entry = historyCache[index];
+            if (!entry) return;
+            button.disabled = true;
+            api
+              .deleteDownloadHistory(entry.originalUrl)
+              .then(function () {
+                showMessage(messageEl, 'Removed from history');
+                return refresh();
+              })
+              .catch(function (err) {
+                showMessage(messageEl, err.message, true);
+                button.disabled = false;
+              });
+          });
+        });
       }
 
 

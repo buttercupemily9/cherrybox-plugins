@@ -168,7 +168,9 @@ public sealed record DownloadHistoryEntry(
     string? Title,
     string? FilePath,
     Guid? MediaItemId,
-    DateTimeOffset DownloadedAt);
+    DateTimeOffset DownloadedAt,
+    bool Failed = false,
+    string? ErrorMessage = null);
 
 public interface IDownloadService
 {
@@ -179,6 +181,8 @@ public interface IDownloadService
     Task<DownloadJobDto?> GetAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
     Task<DownloadJobDto?> RetryAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
     Task<DownloadJobDto?> CancelAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<bool> DeleteFromQueueAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
+    Task<bool> DeleteFromHistoryAsync(string url, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AdminDownloadJobDto>> ListAllAsync(CancellationToken cancellationToken = default);
     Task<DownloadSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task<DownloadSettingsDto> UpdateSettingsAsync(UpdateDownloadSettingsRequest request, CancellationToken cancellationToken = default);

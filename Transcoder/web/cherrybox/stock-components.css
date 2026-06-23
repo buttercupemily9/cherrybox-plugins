@@ -1,0 +1,153 @@
+a {
+  color: var(--pink-dark);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.2rem;
+  background: var(--button-gradient);
+  color: white;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+button.secondary {
+  background: white;
+  color: var(--pink-dark);
+  border: 2px solid var(--pink-light);
+}
+
+input,
+select,
+textarea {
+  border: 2px solid var(--pink-light);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  background: white;
+  color: var(--text-main);
+  width: 100%;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 182, 193, 0.4);
+}
+
+.meta {
+  color: var(--pink-dark);
+  margin: 0.25rem 0 0.75rem;
+}
+
+.error {
+  color: #c0392b;
+  margin-top: 0.5rem;
+}
+
+.form-row {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.search-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.plugin-skin-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.plugin-skin-picker label {
+  font-weight: 600;
+  color: var(--pink-dark);
+}
+
+.plugin-skin-picker select {
+  max-width: 220px;
+}
+
+.folder-browser {
+  text-align: left;
+  background: white;
+  border: 2px solid var(--pink-light);
+  border-radius: 12px;
+  padding: 0.75rem;
+}
+
+.folder-browser__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.folder-browser__toolbar button {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.folder-browser__path {
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--pink-soft);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  word-break: break-all;
+}
+
+.folder-browser__selected {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.folder-browser__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.folder-browser__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  box-shadow: none;
+  color: var(--text-main);
+  padding: 0.45rem 0.5rem;
+  font-weight: 500;
+}
+
+.folder-browser__item:hover {
+  background: var(--pink-soft);
+}
+
+.folder-browser__item--file {
+  font-weight: 500;
+}
+
+.folder-browser__icon {
+  flex-shrink: 0;
+}
+
+.folder-browser-wrap__meta {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+}

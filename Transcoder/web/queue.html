@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transcode queue</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Transcode queue</h1>
+    <p class="meta">Background worker processes one video at a time. Use batch actions to queue libraries or retry failures.</p>
+    <div id="message" class="plugin-message" hidden></div>
+    <div id="worker-status" class="meta"></div>
+    <div class="actions">
+      <button type="button" id="start-worker">Start worker</button>
+      <button type="button" id="stop-worker" class="btn-secondary">Stop worker</button>
+      <button type="button" id="enqueue-all">Transcode all videos</button>
+      <button type="button" id="retry-failed" class="btn-secondary">Retry failed</button>
+    </div>
+    <div class="settings-section">
+      <table class="data-table" id="jobs-table">
+        <thead><tr><th>Status</th><th>Title</th><th>Updated</th><th>Error</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    const msg = document.getElementById('message');
+    function showMessage(text, kind = 'success') {
+      msg.textContent = text; msg.className = `plugin-message ${kind}`; msg.hidden = false;
+    }
+    async function refresh() {
+      const [status, jobs] = await Promise.all([TranscodeApi.workerStatus(), TranscodeApi.listJobs(100)]);
+      document.getElementById('worker-status').textContent =
+        `Worker ${status.backgroundWorkerEnabled ? 'enabled' : 'disabled'} · ${status.isProcessing ? 'processing' : 'idle'} · pending ${status.pendingCount} · failed ${status.failedCount}`;
+      document.querySelector('#jobs-table tbody').innerHTML = jobs.map(j => `<tr>
+        <td>${j.status}</td><td>${j.mediaTitle || j.sourcePath || j.mediaItemId}</td><td>${new Date(j.updatedAt).toLocaleString()}</td><td>${j.errorMessage || ''}</td>
+      </tr>`).join('');
+    }
+    document.getElementById('start-worker').onclick = async () => { await TranscodeApi.startWorker(); showMessage('Worker started.'); await refresh(); };
+    document.getElementById('stop-worker').onclick = async () => { await TranscodeApi.stopWorker(); showMessage('Worker stopped.'); await refresh(); };
+    document.getElementById('enqueue-all').onclick = async () => {
+      const result = await TranscodeApi.enqueue({ allVideos: true, retryFailed: false });
+      showMessage(result.message);
+      await refresh();
+    };
+    document.getElementById('retry-failed').onclick = async () => {
+      const result = await TranscodeApi.enqueue({ allVideos: false, retryFailed: true });
+      showMessage(result.message);
+      await refresh();
+    };
+    refresh().catch(err => showMessage(err.message, 'error'));
+    setInterval(() => refresh().catch(() => undefined), 5000);
+  </script>
+</body>
+</html>

@@ -57,7 +57,7 @@ public sealed class DownloadService : IDownloadService
         var normalized = DownloadUrlNormalizer.Normalize(url);
 
         var historyHit = await _history.FindByUrlAsync(normalized, cancellationToken);
-        if (historyHit is not null)
+        if (historyHit is not null && !historyHit.Failed)
         {
             var media = await ResolveMediaAsync(historyHit.MediaItemId, historyHit.FilePath, cancellationToken);
             return await CreateBlockedResultAsync(
@@ -186,6 +186,7 @@ public sealed class DownloadService : IDownloadService
         job.RetryAfterAt = null;
         job.ProgressPercent = null;
         job.NotifyUser = true;
+        job.RetryCount = 0;
         job.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
         _enrichment.EnqueuePreviewFetch(job.Id, job.Url);
@@ -212,6 +213,33 @@ public sealed class DownloadService : IDownloadService
         job.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
         return await ToDtoAsync(job, cancellationToken);
+    }
+
+    public async Task<bool> DeleteFromQueueAsync(
+        Guid id,
+        Guid? forUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var job = await FindOwnedJobAsync(id, forUserId, cancellationToken);
+        if (job is null)
+            return false;
+
+        if (job.Status == DownloadJobStatus.Running)
+            _jobTracker.TryCancel(id);
+
+        DownloadJobFileCleanup.RemoveCover(job);
+        _db.DownloadJobs.Remove(job);
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DeleteFromHistoryAsync(string url, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            throw new InvalidOperationException("URL is required.");
+
+        var normalized = DownloadUrlNormalizer.Normalize(url.Trim());
+        return await _history.DeleteAsync(normalized, cancellationToken);
     }
 
     public async Task<IReadOnlyList<AdminDownloadJobDto>> ListAllAsync(CancellationToken cancellationToken = default)
@@ -629,12 +657,15 @@ public sealed class DownloadService : IDownloadService
 
 public sealed class DownloadWorker
 {
+    private const int MaxAutoRetryAttempts = 10;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IPlatformPaths _paths;
     private readonly IConfigManager _configManager;
     private readonly IDownloadJobTracker _jobTracker;
     private readonly IDownloadHistoryStore _history;
     private readonly YtDlpToolInstaller? _ytDlpInstaller;
+    private readonly IImageDownloadHandlerRegistry? _imageHandlerRegistry;
     private readonly ILogger<DownloadWorker> _logger;
 
     public DownloadWorker(
@@ -644,6 +675,7 @@ public sealed class DownloadWorker
         IDownloadJobTracker jobTracker,
         IDownloadHistoryStore history,
         YtDlpToolInstaller? ytDlpInstaller,
+        IImageDownloadHandlerRegistry? imageHandlerRegistry,
         ILogger<DownloadWorker> logger)
     {
         _scopeFactory = scopeFactory;
@@ -652,6 +684,7 @@ public sealed class DownloadWorker
         _jobTracker = jobTracker;
         _history = history;
         _ytDlpInstaller = ytDlpInstaller;
+        _imageHandlerRegistry = imageHandlerRegistry;
         _logger = logger;
     }
 
@@ -709,6 +742,12 @@ public sealed class DownloadWorker
 
         foreach (var job in due)
         {
+            if (job.RetryCount >= MaxAutoRetryAttempts)
+            {
+                await ArchiveAndRemoveFailedJobAsync(db, job, stoppingToken);
+                continue;
+            }
+
             job.Status = DownloadJobStatus.Pending;
             job.RetryAfterAt = null;
             job.ErrorMessage = null;
@@ -764,13 +803,21 @@ public sealed class DownloadWorker
 
         try
         {
-            var registry = scope.ServiceProvider.GetService<IImageDownloadHandlerRegistry>();
+            var registry = _imageHandlerRegistry
+                ?? scope.ServiceProvider.GetService<IImageDownloadHandlerRegistry>();
             if (registry is not null &&
                 Uri.TryCreate(job.Url, UriKind.Absolute, out var pageUri) &&
                 registry.FindHandler(pageUri) is { } imageHandler)
             {
                 await ProcessImageJobAsync(scope, db, job, imageHandler, stoppingToken);
                 return;
+            }
+
+            if (Uri.TryCreate(job.Url, UriKind.Absolute, out var url) &&
+                IsImageOnlyHost(url))
+            {
+                throw new InvalidOperationException(
+                    "This image site requires the Image downloader plugin. Open Settings → Plugins, confirm Image downloader is loaded, click Reload plugins, then retry.");
             }
 
             var outputPath = await RunYtDlpAsync(job, stoppingToken);
@@ -858,15 +905,50 @@ public sealed class DownloadWorker
             job.ErrorMessage = ex.Message;
             job.ProgressPercent = null;
             job.UpdatedAt = DateTimeOffset.UtcNow;
-            if (_configManager.Current.Download.AutoRetryFailedDownloads)
+            if (_configManager.Current.Download.AutoRetryFailedDownloads &&
+                job.RetryCount < MaxAutoRetryAttempts)
             {
                 job.RetryAfterAt = DateTimeOffset.UtcNow.AddMinutes(
                     Math.Max(1, _configManager.Current.Download.AutoRetryDelayMinutes));
+                await db.SaveChangesAsync(stoppingToken);
+            }
+            else
+            {
+                await db.SaveChangesAsync(stoppingToken);
+                if (job.RetryCount >= MaxAutoRetryAttempts &&
+                    _configManager.Current.Download.AutoRetryFailedDownloads)
+                {
+                    await ArchiveAndRemoveFailedJobAsync(db, job, stoppingToken);
+                }
             }
 
-            await db.SaveChangesAsync(stoppingToken);
             _logger.LogError(ex, "Download failed for {Url}", job.Url);
         }
+    }
+
+    private async Task ArchiveAndRemoveFailedJobAsync(
+        CherryBoxDbContext db,
+        DownloadJob job,
+        CancellationToken stoppingToken)
+    {
+        var title = job.Title ?? job.Url;
+        await _history.RecordAsync(
+            job.NormalizedUrl,
+            job.Url,
+            title,
+            null,
+            null,
+            stoppingToken,
+            job.ErrorMessage,
+            failed: true);
+
+        DownloadJobFileCleanup.RemoveCover(job);
+        db.DownloadJobs.Remove(job);
+        await db.SaveChangesAsync(stoppingToken);
+        _logger.LogWarning(
+            "Download removed from queue after {MaxRetries} auto-retries: {Url}",
+            MaxAutoRetryAttempts,
+            job.Url);
     }
 
     private async Task ProcessImageJobAsync(
@@ -1210,6 +1292,13 @@ public sealed class DownloadWorker
         }
 
         return null;
+    }
+
+    private static bool IsImageOnlyHost(Uri url)
+    {
+        var host = url.Host;
+        return host.Contains("imagefap.com", StringComparison.OrdinalIgnoreCase)
+            || host.Contains("imagefap.net", StringComparison.OrdinalIgnoreCase);
     }
 }
 
