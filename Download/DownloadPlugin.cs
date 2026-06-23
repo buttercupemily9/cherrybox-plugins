@@ -11,7 +11,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "download";
     public string Name => "Video downloader";
-    public string Version => "1.2.1";
+    public string Version => "1.2.2";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -33,11 +33,12 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterSingleton(jobTracker);
         registry.RegisterSingleton(history);
         registry.RegisterSingleton(ytDlpInstaller);
-        registry.RegisterSingleton(new DownloadJobEnrichmentService(
+        var enrichment = new DownloadJobEnrichmentService(
             services.GetRequiredService<IServiceScopeFactory>(),
             services.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
             services.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
-            services.GetRequiredService<ILogger<DownloadJobEnrichmentService>>()));
+            services.GetRequiredService<ILogger<DownloadJobEnrichmentService>>());
+        registry.RegisterSingleton(enrichment);
         registry.RegisterScoped<IDownloadLimitService>(CreateDownloadLimitService);
         registry.RegisterScoped<IDownloadService>(sp =>
         {
@@ -49,7 +50,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
                 jobTracker,
                 sp.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
                 limits,
-                sp.GetRequiredService<DownloadJobEnrichmentService>());
+                enrichment);
         });
         registry.RegisterSupportAppUpdater(ytDlpInstaller);
     }
