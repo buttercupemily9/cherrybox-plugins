@@ -8,11 +8,16 @@ public sealed record DownloadJobDto(
     Guid Id,
     string Url,
     DownloadJobStatus Status,
+    string? Title,
+    string SiteName,
     string? OutputPath,
     string? ErrorMessage,
     string? BlockReason,
     Guid? ExistingMediaItemId,
     string? ExistingMediaTitle,
+    bool HasCover,
+    double? ProgressPercent,
+    bool NotifyUser,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? RetryAfterAt,
@@ -22,17 +27,32 @@ public sealed record AdminDownloadJobDto(
     Guid Id,
     string Url,
     DownloadJobStatus Status,
+    string? Title,
+    string SiteName,
     string? OutputPath,
     string? ErrorMessage,
     string? BlockReason,
     Guid? ExistingMediaItemId,
     string? ExistingMediaTitle,
+    bool HasCover,
+    double? ProgressPercent,
+    bool NotifyUser,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? RetryAfterAt,
     int RetryCount,
     Guid? CreatedByUserId,
     string? CreatedByUsername);
+
+public interface IDownloadMediaProcessor
+{
+    Task<string?> LookupAndSerializeMetadataAsync(string url, CancellationToken cancellationToken = default);
+    Task ProcessCompletedDownloadAsync(
+        Guid mediaItemId,
+        string url,
+        string? metadataJson,
+        CancellationToken cancellationToken = default);
+}
 
 public sealed record EnqueueDownloadResult(
     bool Accepted,

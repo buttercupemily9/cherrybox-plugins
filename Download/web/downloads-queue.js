@@ -6,8 +6,10 @@
     var formatTime = ui.formatTime;
     var escapeHtml = ui.escapeHtml;
     var showMessage = ui.showMessage;
+    var shortUrl = ui.shortUrl || function (url) { return url; };
     var emptyText = (options && options.emptyText) || 'No downloads queued yet.';
     var pollMs = (options && options.pollMs) || 4000;
+    var pollMsEnriching = (options && options.pollMsEnriching) || 1500;
 
     var retryBusy = null;
     var cancelBusy = null;
@@ -20,6 +22,62 @@
 
     function canCancel(status) {
       return status === 'Pending' || status === 'Running';
+    }
+
+    var downloadCoverUrl = (options && options.downloadCoverUrl) || (ui.downloadCoverUrl || function () { return null; });
+
+    function coverUrl(job) {
+      return job.hasCover ? downloadCoverUrl(job.id) : null;
+    }
+
+    function needsEnrichment(job) {
+      return (job.status === 'Pending' || job.status === 'Running') && (!job.title || !job.hasCover);
+    }
+
+    function renderProgress(job) {
+      if (job.status !== 'Running' || job.progressPercent == null)
+        return '';
+
+      var percent = Math.max(0, Math.min(100, Math.round(job.progressPercent)));
+      return (
+        '<div class="download-progress" aria-label="Download progress">' +
+        '<div class="download-progress__bar" style="width:' +
+        percent +
+        '%"></div>' +
+        '</div>' +
+        '<p class="meta download-progress__label">' +
+        percent +
+        '%</p>'
+      );
+    }
+
+    function renderCover(job) {
+      var cover = coverUrl(job);
+      if (cover) {
+        return (
+          '<img class="download-row__cover" src="' +
+          escapeHtml(cover) +
+          '" alt="" loading="lazy" />'
+        );
+      }
+
+      if (needsEnrichment(job)) {
+        return '<div class="download-row__cover download-row__cover--loading" aria-hidden="true"></div>';
+      }
+
+      return '<div class="download-row__cover download-row__cover--placeholder" aria-hidden="true"></div>';
+    }
+
+    function renderTitle(job) {
+      if (job.title) {
+        return '<h3 class="download-row__title">' + escapeHtml(job.title) + '</h3>';
+      }
+
+      if (needsEnrichment(job)) {
+        return '<h3 class="download-row__title download-row__title--pending">Fetching video info…</h3>';
+      }
+
+      return '<h3 class="download-row__title download-row__title--muted">' + escapeHtml(shortUrl(job.url)) + '</h3>';
     }
 
     function render(downloads) {
@@ -41,24 +99,33 @@
         '<ul class="download-list">' +
         downloadsCache
           .map(function (d) {
+            var siteName = d.siteName ? escapeHtml(d.siteName) : 'Unknown';
             return (
               '<li class="download-row">' +
+              renderCover(d) +
               '<div class="download-row__info">' +
-              '<div class="download-row__header">' +
+              '<div class="download-row__meta-line">' +
               '<span class="status">' +
               escapeHtml(STATUS_LABEL[d.status] ?? d.status) +
+              '</span>' +
+              '<span class="download-row__site">' +
+              siteName +
               '</span>' +
               (showUser
                 ? '<span class="meta download-row__user">' +
                   escapeHtml(d.createdByUsername || 'Unknown user') +
                   '</span>'
                 : '') +
+              '</div>' +
+              renderTitle(d) +
               '<a class="download-row__url" href="' +
               escapeHtml(d.url) +
-              '" target="_blank" rel="noreferrer">' +
+              '" target="_blank" rel="noreferrer" title="' +
               escapeHtml(d.url) +
+              '">' +
+              escapeHtml(shortUrl(d.url)) +
               '</a>' +
-              '</div>' +
+              renderProgress(d) +
               (d.outputPath ? '<p class="meta">Saved to ' + escapeHtml(d.outputPath) + '</p>' : '') +
               (d.blockReason || d.errorMessage
                 ? '<p class="error">' + escapeHtml(d.blockReason ?? d.errorMessage) + '</p>'
@@ -141,14 +208,26 @@
       });
     }
 
-    function refresh() {
-      var listDownloads = options.listDownloads || api.listDownloads.bind(api);
-      return listDownloads().then(render);
+    function schedulePoll() {
+      if (pollTimer !== null)
+        global.clearInterval(pollTimer);
+
+      var interval = downloadsCache.some(needsEnrichment) ? pollMsEnriching : pollMs;
+      pollTimer = global.setInterval(function () {
+        refresh().catch(function () {});
+      }, interval);
     }
 
-    pollTimer = global.setInterval(function () {
-      refresh().catch(function () {});
-    }, pollMs);
+    function refresh() {
+      var listDownloads = options.listDownloads || api.listDownloads.bind(api);
+      return listDownloads().then(function (downloads) {
+        render(downloads);
+        schedulePoll();
+      });
+    }
+
+    schedulePoll();
+    refresh().catch(function () {});
 
     return {
       refresh: refresh,

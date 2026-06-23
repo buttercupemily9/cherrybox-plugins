@@ -46,6 +46,94 @@ body {
   box-shadow: var(--shadow);
 }
 
+.download-row__cover {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--pink-light) 20%, transparent);
+}
+
+.download-row__cover--placeholder,
+.download-row__cover--loading {
+  display: block;
+}
+
+.download-row__cover--loading {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--pink-light) 18%, transparent) 0%,
+    color-mix(in srgb, var(--pink-light) 35%, transparent) 50%,
+    color-mix(in srgb, var(--pink-light) 18%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: download-cover-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes download-cover-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.download-row__meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.download-row__site {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pink-light) 30%, transparent);
+  color: var(--pink-dark);
+}
+
+.download-row__title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.download-row__title--pending {
+  color: var(--muted, #888);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.download-row__title--muted {
+  color: var(--muted, #888);
+  font-weight: 500;
+}
+
+.download-progress {
+  margin-top: 0.5rem;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pink-light) 25%, transparent);
+  overflow: hidden;
+}
+
+.download-progress__bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--pink), var(--pink-dark));
+  transition: width 0.35s ease;
+}
+
+.download-progress__label {
+  margin-top: 0.25rem;
+}
+
 .download-row__info {
   flex: 1;
   min-width: 0;
@@ -59,7 +147,16 @@ body {
 }
 
 .download-row__url {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted, #888);
   word-break: break-all;
+  text-decoration: none;
+}
+
+.download-row__url:hover {
+  color: var(--pink-dark);
+  text-decoration: underline;
 }
 
 .download-row__user {

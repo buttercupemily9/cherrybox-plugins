@@ -11,7 +11,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "download";
     public string Name => "Video downloader";
-    public string Version => "1.0.0";
+    public string Version => "1.2.0";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -33,17 +33,23 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterSingleton(jobTracker);
         registry.RegisterSingleton(history);
         registry.RegisterSingleton(ytDlpInstaller);
+        registry.RegisterSingleton(new DownloadJobEnrichmentService(
+            services.GetRequiredService<IServiceScopeFactory>(),
+            services.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
+            services.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
+            services.GetRequiredService<ILogger<DownloadJobEnrichmentService>>()));
         registry.RegisterScoped<IDownloadLimitService>(CreateDownloadLimitService);
         registry.RegisterScoped<IDownloadService>(sp =>
         {
-            var limits = registry.Resolve<IDownloadLimitService>(sp) ?? CreateDownloadLimitService(sp);
+            var limits = CreateDownloadLimitService(sp);
             return new DownloadService(
                 sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
                 history,
                 sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
                 jobTracker,
                 sp.GetRequiredService<CherryBox.Core.Platform.IPlatformPaths>(),
-                limits);
+                limits,
+                sp.GetRequiredService<DownloadJobEnrichmentService>());
         });
         registry.RegisterSupportAppUpdater(ytDlpInstaller);
     }

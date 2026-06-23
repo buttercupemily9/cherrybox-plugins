@@ -29,8 +29,8 @@
       "id": "download",
       "folder": "Download",
       "name": "Video downloader",
-      "version": "1.0.0",
-      "description": "Queue and download videos with yt-dlp, with library scan and StashBox metadata lookup.",
+      "version": "1.1.1",
+      "description": "Queue and download videos with yt-dlp, with library scan and metadata lookup. Supports image downloads when the Image downloader add-on is installed.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Download",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
@@ -84,6 +84,18 @@
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Social/icon.png",
       "screenshotUrls": [],
       "changelog": "Initial social plugin with messaging, friends, and media engagement."
+    },
+    {
+      "id": "image-download",
+      "folder": "ImageDownload",
+      "name": "Image downloader",
+      "version": "1.0.0",
+      "description": "Download images and galleries from Rule34, ImageFap, Pornhub albums, Motherless, xHamster photos, and more into Pictures or Galleries.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ImageDownload",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial image and gallery download support for popular image sites."
     }
   ]
 }

@@ -174,10 +174,10 @@ public sealed class DownloadLimitService : IDownloadLimitService
         var requests = await _db.DownloadLimitRequests
             .AsNoTracking()
             .Include(r => r.User)
-            .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(cancellationToken);
 
         return requests
+            .OrderByDescending(r => r.CreatedAt)
             .Select(r => ToRequestDto(r, r.User?.Username ?? "Unknown"))
             .ToList();
     }
@@ -291,12 +291,15 @@ public sealed class DownloadLimitService : IDownloadLimitService
             : 0;
     }
 
-    private Task<int> CountCompletedAsync(Guid userId, DateTimeOffset periodStart, CancellationToken cancellationToken) =>
-        _db.DownloadJobs.CountAsync(
-            j => j.CreatedByUserId == userId &&
-                 j.Status == DownloadJobStatus.Completed &&
-                 j.UpdatedAt >= periodStart,
-            cancellationToken);
+    private async Task<int> CountCompletedAsync(Guid userId, DateTimeOffset periodStart, CancellationToken cancellationToken)
+    {
+        var jobs = await _db.DownloadJobs
+            .AsNoTracking()
+            .Where(j => j.CreatedByUserId == userId && j.Status == DownloadJobStatus.Completed)
+            .ToListAsync(cancellationToken);
+
+        return jobs.Count(j => j.UpdatedAt >= periodStart);
+    }
 
     private Task<int> CountInFlightAsync(Guid userId, CancellationToken cancellationToken) =>
         _db.DownloadJobs.CountAsync(
