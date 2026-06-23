@@ -633,13 +633,21 @@ public sealed class DownloadWorker
             {
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
-                await RequeueDueRetriesAsync(db, stoppingToken);
+                try
+                {
+                    await RequeueDueRetriesAsync(db, stoppingToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(ex, "Failed to requeue failed downloads for auto-retry.");
+                }
+
                 await RecoverInterruptedJobsAsync(db, stoppingToken);
 
                 var pending = await db.DownloadJobs
                     .Where(j => j.Status == DownloadJobStatus.Pending)
                     .ToListAsync(stoppingToken);
-                var job = pending.MinBy(j => j.CreatedAt);
+                var job = pending.Count == 0 ? null : pending.MinBy(j => j.CreatedAt);
 
                 if (job is null)
                 {
@@ -651,7 +659,7 @@ public sealed class DownloadWorker
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning("Download worker paused — database unavailable. Retrying in 30s.");
+                _logger.LogWarning(ex, "Download worker error; retrying in 30s.");
                 await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
             }
         }
@@ -663,11 +671,11 @@ public sealed class DownloadWorker
             return;
 
         var now = DateTimeOffset.UtcNow;
-        var due = await db.DownloadJobs
-            .Where(j => j.Status == DownloadJobStatus.Failed &&
-                        j.RetryAfterAt != null &&
-                        j.RetryAfterAt <= now)
+        var candidates = await db.DownloadJobs
+            .Where(j => j.Status == DownloadJobStatus.Failed && j.RetryAfterAt != null)
             .ToListAsync(stoppingToken);
+
+        var due = candidates.Where(j => j.RetryAfterAt <= now).ToList();
 
         foreach (var job in due)
         {
