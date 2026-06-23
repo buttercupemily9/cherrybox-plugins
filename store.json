@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 8,
+  "catalogVersion": 9,
   "plugins": [
     {
       "id": "backup",
@@ -29,13 +29,13 @@
       "id": "download",
       "folder": "Download",
       "name": "Video downloader",
-      "version": "1.1.1",
+      "version": "1.2.1",
       "description": "Queue and download videos with yt-dlp, with library scan and metadata lookup. Supports image downloads when the Image downloader add-on is installed.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Download",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Video downloader moved from core into a plugin."
+      "changelog": "Queue/history delete controls, 10-retry auto-archive for failed jobs, and compatibility with current CherryBox host APIs."
     },
     {
       "id": "password-reset",

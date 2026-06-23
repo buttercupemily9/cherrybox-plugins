@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CherryBox.Plugins.Abstractions\CherryBox.Plugins.Abstractions.csproj">
+    <ProjectReference Include="$(CherryBoxSrc)\CherryBox.Plugins.Abstractions\CherryBox.Plugins.Abstractions.csproj">
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="$(CherryBoxSrc)\CherryBox.Core\CherryBox.Core.csproj" />
