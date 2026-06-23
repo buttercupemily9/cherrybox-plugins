@@ -30,6 +30,7 @@
     </div>
   </div>
   <script>
+    document.addEventListener('DOMContentLoaded', function () {
     const msg = document.getElementById('message');
     function showMessage(text, kind = 'success') {
       msg.textContent = text; msg.className = `plugin-message ${kind}`; msg.hidden = false;
@@ -56,6 +57,7 @@
     };
     refresh().catch(err => showMessage(err.message, 'error'));
     setInterval(() => refresh().catch(() => undefined), 5000);
+    });
   </script>
 </body>
 </html>

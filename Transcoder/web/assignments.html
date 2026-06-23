@@ -29,6 +29,7 @@
     </form>
   </div>
   <script>
+    document.addEventListener('DOMContentLoaded', function () {
     let profiles = [];
     let libraries = [];
     let overrides = [];
@@ -91,6 +92,7 @@
       showMessage('Assignments saved.');
     };
     load().catch(err => showMessage(err.message, 'error'));
+    });
   </script>
 </body>
 </html>
