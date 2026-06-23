@@ -61,6 +61,9 @@
           cancelDownload: function (id) {
             return api.cancelAdminDownload(id);
           },
+          deleteDownload: function (id) {
+            return api.deleteAdminDownload(id);
+          },
           onActiveCountChange: function (count) {
             var heading = document.getElementById('queue-heading');
             if (!heading) return;

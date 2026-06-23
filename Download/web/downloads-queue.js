@@ -13,6 +13,7 @@
 
     var retryBusy = null;
     var cancelBusy = null;
+    var deleteBusy = null;
     var pollTimer = null;
     var downloadsCache = [];
 
@@ -136,6 +137,9 @@
               (d.retryAfterAt && d.status === 'Failed'
                 ? '<p class="meta">Auto-retry after ' + formatTime(d.retryAfterAt) + '</p>'
                 : '') +
+              (d.retryCount > 0
+                ? '<p class="meta">Retry attempt ' + d.retryCount + ' of 10</p>'
+                : '') +
               (showUser && d.createdAt
                 ? '<p class="meta">Queued ' + formatTime(d.createdAt) + '</p>'
                 : '') +
@@ -159,6 +163,13 @@
                   (cancelBusy === d.id ? 'Cancelling…' : 'Cancel') +
                   '</button>'
                 : '') +
+              '<button type="button" class="secondary" data-delete="' +
+              d.id +
+              '" ' +
+              (deleteBusy ? 'disabled' : '') +
+              '>' +
+              (deleteBusy === d.id ? 'Removing…' : 'Remove') +
+              '</button>' +
               '</div>' +
               '</li>'
             );
@@ -168,6 +179,7 @@
 
       var retryDownload = options.retryDownload || api.retryDownload.bind(api);
       var cancelDownload = options.cancelDownload || api.cancelDownload.bind(api);
+      var deleteDownload = options.deleteDownload || api.deleteDownload.bind(api);
 
       container.querySelectorAll('[data-retry]').forEach(function (button) {
         button.addEventListener('click', function () {
@@ -203,6 +215,25 @@
             })
             .finally(function () {
               cancelBusy = null;
+            });
+        });
+      });
+
+      container.querySelectorAll('[data-delete]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var id = button.getAttribute('data-delete');
+          deleteBusy = id;
+          render(downloadsCache);
+          deleteDownload(id)
+            .then(function () {
+              if (messageEl) showMessage(messageEl, 'Removed from queue');
+              return refresh();
+            })
+            .catch(function (err) {
+              if (messageEl) showMessage(messageEl, err.message, true);
+            })
+            .finally(function () {
+              deleteBusy = null;
             });
         });
       });

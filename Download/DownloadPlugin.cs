@@ -11,7 +11,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "download";
     public string Name => "Video downloader";
-    public string Version => "1.2.0";
+    public string Version => "1.2.1";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -76,9 +76,10 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         }
 
         var ytDlp = registry.Resolve<YtDlpToolInstaller>(context.Services);
+        var imageHandlers = context.Services.GetService<IImageDownloadHandlerRegistry>();
 
         _workerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var worker = new DownloadWorker(scopeFactory, paths, config, jobTracker, history, ytDlp, logger);
+        var worker = new DownloadWorker(scopeFactory, paths, config, jobTracker, history, ytDlp, imageHandlers, logger);
         _workerTask = worker.RunAsync(_workerCts.Token);
 
         if (ytDlp is not null)

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Library assignments</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Library assignments</h1>
+    <p class="meta">Choose default and per-library transcode profiles. Resolution order: library override → profile binding → global default.</p>
+    <div id="message" class="plugin-message" hidden></div>
+    <form id="assignments-form">
+      <div class="form-row inline"><label><input type="checkbox" id="globalEnabled" /> Transcoding enabled</label></div>
+      <div class="form-row inline"><label><input type="checkbox" id="autoEnqueueOnScan" /> Auto-enqueue new/changed videos on scan</label></div>
+      <div class="form-row inline"><label><input type="checkbox" id="backgroundWorkerEnabled" /> Background worker (24/7 queue processing)</label></div>
+      <div class="form-row"><label for="globalDefaultProfileId">Global default profile</label><select id="globalDefaultProfileId"></select></div>
+      <div class="settings-section">
+        <h2>Per-library overrides</h2>
+        <div id="overrides"></div>
+        <button type="button" id="add-override" class="btn-secondary">Add library override</button>
+      </div>
+      <div class="actions"><button type="submit">Save assignments</button></div>
+    </form>
+  </div>
+  <script>
+    let profiles = [];
+    let libraries = [];
+    let overrides = [];
+    const msg = document.getElementById('message');
+    function showMessage(text, kind = 'success') {
+      msg.textContent = text; msg.className = `plugin-message ${kind}`; msg.hidden = false;
+    }
+    function profileOptions(selected) {
+      return ['<option value="">— none —</option>'].concat(profiles.map(p => `<option value="${p.id}" ${p.id===selected?'selected':''}>${p.name}</option>`)).join('');
+    }
+    function renderOverrides() {
+      document.getElementById('overrides').innerHTML = overrides.map((o, i) => `<div class="form-row">
+        <select data-i="${i}" class="override-library">${libraries.map(l => `<option value="${l.id}" ${l.id===o.libraryFolderId?'selected':''}>${l.displayName}</option>`).join('')}</select>
+        <select data-i="${i}" class="override-profile">${profileOptions(o.profileId)}</select>
+        <label><input type="checkbox" data-i="${i}" class="override-enabled" ${o.enabled?'checked':''}/> Enabled</label>
+        <button type="button" data-remove="${i}">Remove</button>
+      </div>`).join('');
+    }
+    async function load() {
+      [profiles, libraries] = await Promise.all([TranscodeApi.listProfiles(), TranscodeApi.listLibraries()]);
+      const assignments = await TranscodeApi.getAssignments();
+      document.getElementById('globalEnabled').checked = assignments.globalEnabled;
+      document.getElementById('autoEnqueueOnScan').checked = assignments.autoEnqueueOnScan;
+      document.getElementById('backgroundWorkerEnabled').checked = assignments.backgroundWorkerEnabled;
+      document.getElementById('globalDefaultProfileId').innerHTML = profileOptions(assignments.globalDefaultProfileId);
+      overrides = [...(assignments.libraryOverrides || [])];
+      renderOverrides();
+    }
+    document.getElementById('add-override').onclick = () => {
+      if (!libraries.length || !profiles.length) return;
+      overrides.push({ libraryFolderId: libraries[0].id, profileId: profiles[0].id, enabled: true });
+      renderOverrides();
+    };
+    document.getElementById('overrides').onclick = (e) => {
+      const remove = e.target.getAttribute('data-remove');
+      if (remove != null) { overrides.splice(Number(remove), 1); renderOverrides(); }
+    };
+    document.getElementById('assignments-form').onsubmit = async (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.override-library').forEach(el => {
+        const i = Number(el.getAttribute('data-i'));
+        overrides[i].libraryFolderId = el.value;
+      });
+      document.querySelectorAll('.override-profile').forEach(el => {
+        const i = Number(el.getAttribute('data-i'));
+        overrides[i].profileId = el.value;
+      });
+      document.querySelectorAll('.override-enabled').forEach(el => {
+        const i = Number(el.getAttribute('data-i'));
+        overrides[i].enabled = el.checked;
+      });
+      await TranscodeApi.updateAssignments({
+        globalDefaultProfileId: document.getElementById('globalDefaultProfileId').value || null,
+        globalEnabled: document.getElementById('globalEnabled').checked,
+        backgroundWorkerEnabled: document.getElementById('backgroundWorkerEnabled').checked,
+        autoEnqueueOnScan: document.getElementById('autoEnqueueOnScan').checked,
+        libraryOverrides: overrides,
+        profileLibraryBindings: [],
+      });
+      showMessage('Assignments saved.');
+    };
+    load().catch(err => showMessage(err.message, 'error'));
+  </script>
+</body>
+</html>

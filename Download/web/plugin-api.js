@@ -39,6 +39,7 @@ const api = {
   listAdminDownloadQueue: () => apiRequest('/settings/downloads/queue'),
   retryAdminDownload: (id) => apiRequest('/settings/downloads/queue/' + encodeURIComponent(id) + '/retry', { method: 'POST' }),
   cancelAdminDownload: (id) => apiRequest('/settings/downloads/queue/' + encodeURIComponent(id) + '/cancel', { method: 'POST' }),
+  deleteAdminDownload: (id) => apiRequest('/settings/downloads/queue/' + encodeURIComponent(id), { method: 'DELETE' }),
   listDownloadHistory: () => apiRequest('/downloads/history'),
   enqueueDownload: (url, targetFolderId) =>
     apiRequest('/downloads', {
@@ -47,6 +48,9 @@ const api = {
     }),
   retryDownload: (id) => apiRequest(`/downloads/${id}/retry`, { method: 'POST' }),
   cancelDownload: (id) => apiRequest(`/downloads/${id}/cancel`, { method: 'POST' }),
+  deleteDownload: (id) => apiRequest(`/downloads/${id}`, { method: 'DELETE' }),
+  deleteDownloadHistory: (url) =>
+    apiRequest('/downloads/history?url=' + encodeURIComponent(url), { method: 'DELETE' }),
   getDownloadSettings: () => apiRequest('/settings/downloads'),
   updateDownloadSettings: (data) =>
     apiRequest('/settings/downloads', { method: 'PUT', body: JSON.stringify(data) }),

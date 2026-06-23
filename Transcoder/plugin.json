@@ -1,0 +1,12 @@
+{
+  "id": "transcoder",
+  "name": "Media transcoder",
+  "version": "1.0.0",
+  "entryAssembly": "Transcoder.Plugin.dll",
+  "entryType": "CherryBox.Transcoder.Plugin.TranscoderPlugin",
+  "settingsTabs": [
+    { "id": "profiles", "label": "Transcode profiles", "icon": "transcode", "page": "profiles.html", "order": 85 },
+    { "id": "assignments", "label": "Library assignments", "icon": "library", "page": "assignments.html", "order": 86 },
+    { "id": "queue", "label": "Transcode queue", "icon": "queue", "page": "queue.html", "order": 87 }
+  ]
+}

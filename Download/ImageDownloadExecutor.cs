@@ -247,7 +247,14 @@ public sealed class ImageDownloadExecutor
 
     private static async Task DownloadFileAsync(string url, string destPath, CancellationToken cancellationToken)
     {
-        using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+            uri.Host.Contains("imagefap.com", StringComparison.OrdinalIgnoreCase))
+        {
+            request.Headers.Referrer = new Uri("https://www.imagefap.com/");
+        }
+
+        using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var file = File.Create(destPath);
@@ -348,7 +355,8 @@ public sealed class ImageDownloadExecutor
         {
             Timeout = TimeSpan.FromMinutes(5),
         };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("CherryBox/1.0 (+image-download)");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         return client;
     }
 }

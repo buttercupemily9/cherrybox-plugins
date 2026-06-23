@@ -57,6 +57,18 @@ public interface ILibraryHook
     Task OnMediaIndexedAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
 }
 
+public interface ILibraryHookRegistry
+{
+    void Register(ILibraryHook hook);
+    void Clear();
+    IReadOnlyList<ILibraryHook> GetHooks();
+}
+
+public interface ILibraryHookNotifier
+{
+    Task NotifyMediaIndexedAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
+}
+
 public interface IMetadataProvider
 {
     string ProviderName { get; }
