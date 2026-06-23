@@ -18,7 +18,12 @@ public interface IDownloadHistoryStore
         Guid? mediaItemId,
         CancellationToken cancellationToken = default,
         string? errorMessage = null,
-        bool failed = false);
+        bool failed = false,
+        Guid? createdByUserId = null);
+    Task<int> CountSuccessfulForUserSinceAsync(
+        Guid userId,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default);
     Task UpdateMediaItemAsync(string normalizedUrl, Guid mediaItemId, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string normalizedUrl, CancellationToken cancellationToken = default);
 }
@@ -80,6 +85,28 @@ public sealed class DownloadHistoryStore : IDownloadHistoryStore
         return results;
     }
 
+    public async Task<int> CountSuccessfulForUserSinceAsync(
+        Guid userId,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(1)
+            FROM DownloadHistory
+            WHERE CreatedByUserId = $userId
+              AND Failed = 0
+              AND DownloadedAt >= $since;
+            """;
+        command.Parameters.AddWithValue("$userId", userId.ToString());
+        command.Parameters.AddWithValue("$since", since.ToString("O"));
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(result);
+    }
+
     public async Task RecordAsync(
         string normalizedUrl,
         string originalUrl,
@@ -88,15 +115,16 @@ public sealed class DownloadHistoryStore : IDownloadHistoryStore
         Guid? mediaItemId,
         CancellationToken cancellationToken = default,
         string? errorMessage = null,
-        bool failed = false)
+        bool failed = false,
+        Guid? createdByUserId = null)
     {
         await EnsureInitializedAsync(cancellationToken);
         await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT INTO DownloadHistory (NormalizedUrl, OriginalUrl, Title, FilePath, MediaItemId, DownloadedAt, Failed, ErrorMessage)
-            VALUES ($normalizedUrl, $originalUrl, $title, $filePath, $mediaItemId, $downloadedAt, $failed, $errorMessage)
+            INSERT INTO DownloadHistory (NormalizedUrl, OriginalUrl, Title, FilePath, MediaItemId, DownloadedAt, Failed, ErrorMessage, CreatedByUserId)
+            VALUES ($normalizedUrl, $originalUrl, $title, $filePath, $mediaItemId, $downloadedAt, $failed, $errorMessage, $createdByUserId)
             ON CONFLICT(NormalizedUrl) DO UPDATE SET
                 OriginalUrl = excluded.OriginalUrl,
                 Title = COALESCE(excluded.Title, DownloadHistory.Title),
@@ -104,7 +132,8 @@ public sealed class DownloadHistoryStore : IDownloadHistoryStore
                 MediaItemId = CASE WHEN excluded.Failed = 1 THEN NULL ELSE COALESCE(excluded.MediaItemId, DownloadHistory.MediaItemId) END,
                 DownloadedAt = excluded.DownloadedAt,
                 Failed = excluded.Failed,
-                ErrorMessage = excluded.ErrorMessage;
+                ErrorMessage = excluded.ErrorMessage,
+                CreatedByUserId = COALESCE(excluded.CreatedByUserId, DownloadHistory.CreatedByUserId);
             """;
         command.Parameters.AddWithValue("$normalizedUrl", normalizedUrl);
         command.Parameters.AddWithValue("$originalUrl", originalUrl);
@@ -114,6 +143,7 @@ public sealed class DownloadHistoryStore : IDownloadHistoryStore
         command.Parameters.AddWithValue("$downloadedAt", DateTimeOffset.UtcNow.ToString("O"));
         command.Parameters.AddWithValue("$failed", failed ? 1 : 0);
         command.Parameters.AddWithValue("$errorMessage", (object?)errorMessage ?? DBNull.Value);
+        command.Parameters.AddWithValue("$createdByUserId", createdByUserId?.ToString() ?? (object)DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -175,6 +205,7 @@ public sealed class DownloadHistoryStore : IDownloadHistoryStore
             await command.ExecuteNonQueryAsync(cancellationToken);
             await EnsureColumnAsync(connection, "Failed", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
             await EnsureColumnAsync(connection, "ErrorMessage", "TEXT NULL", cancellationToken);
+            await EnsureColumnAsync(connection, "CreatedByUserId", "TEXT NULL", cancellationToken);
             _initialized = true;
         }
         catch (Exception ex)

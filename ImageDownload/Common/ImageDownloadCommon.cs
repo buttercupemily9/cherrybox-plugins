@@ -25,6 +25,26 @@ internal static class ImageFetchHelper
     internal static Task<string> GetStringAsync(string url, CancellationToken cancellationToken) =>
         Http.GetStringAsync(url, cancellationToken);
 
+    internal static Task<string> GetPornhubPageAsync(string url, CancellationToken cancellationToken) =>
+        GetStringAsync(url, cancellationToken, "accessAgeDisclaimerPH=1");
+
+    internal static async Task<string> GetStringAsync(
+        string url,
+        CancellationToken cancellationToken,
+        string? cookieHeader = null,
+        string? referer = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (!string.IsNullOrWhiteSpace(cookieHeader))
+            request.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
+        if (!string.IsNullOrWhiteSpace(referer))
+            request.Headers.Referrer = new Uri(referer);
+
+        using var response = await Http.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+
     internal static async Task<byte[]> GetBytesAsync(string url, CancellationToken cancellationToken)
     {
         using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
