@@ -208,7 +208,8 @@ public sealed class DownloadJobEnrichmentService
         string coversDir,
         CancellationToken cancellationToken)
     {
-        if (!TryParseJobUri(url, out var uri))
+        var uri = TryParseJobUri(url);
+        if (uri is null)
             return;
 
         IImageDownloadHandler? handler = null;
@@ -244,7 +245,8 @@ public sealed class DownloadJobEnrichmentService
         string url,
         CancellationToken cancellationToken)
     {
-        if (!TryParseJobUri(url, out var uri))
+        var uri = TryParseJobUri(url);
+        if (uri is null)
             return false;
 
         IImageDownloadHandler? handler = null;
@@ -274,18 +276,19 @@ public sealed class DownloadJobEnrichmentService
         }
     }
 
-    private static bool TryParseJobUri(string url, out Uri uri)
+    private static Uri? TryParseJobUri(string url)
     {
-        if (Uri.TryCreate(url, UriKind.Absolute, out uri))
-            return true;
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return uri;
 
         var normalized = url.Contains("://", StringComparison.Ordinal) ? url : "https://" + url;
-        return Uri.TryCreate(normalized, UriKind.Absolute, out uri);
+        return Uri.TryCreate(normalized, UriKind.Absolute, out uri) ? uri : null;
     }
 
     private static bool IsImageDownloadUrl(string url)
     {
-        if (!TryParseJobUri(url, out var uri))
+        var uri = TryParseJobUri(url);
+        if (uri is null)
             return false;
 
         if (PornhubGifDownloadHelper.IsGifUrl(uri))
