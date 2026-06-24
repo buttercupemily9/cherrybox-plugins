@@ -53,6 +53,7 @@ body {
   border-radius: 8px;
   flex-shrink: 0;
   background: color-mix(in srgb, var(--pink-light) 20%, transparent);
+  display: block;
 }
 
 .download-row__cover--placeholder,

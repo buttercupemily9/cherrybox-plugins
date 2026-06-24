@@ -77,12 +77,6 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         var history = registry.Resolve<DownloadHistoryStore>(context.Services)!;
         var logger = context.Services.GetRequiredService<ILogger<DownloadWorker>>();
 
-        using (var scope = scopeFactory.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<CherryBox.Data.CherryBoxDbContext>();
-            await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, paths, cancellationToken);
-        }
-
         var ytDlp = registry.Resolve<YtDlpToolInstaller>(context.Services);
         var imageHandlers = context.Services.GetService<IImageDownloadHandlerRegistry>();
 

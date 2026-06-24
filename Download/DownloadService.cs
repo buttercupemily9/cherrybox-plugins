@@ -105,6 +105,20 @@ public sealed class DownloadService : IDownloadService
             }
         }
 
+        if (NeedsDownloadsLibraryFolder(url) &&
+            await DownloadPaths.FindDownloadsFolderAsync(_db, cancellationToken) is null)
+        {
+            return await CreateBlockedResultAsync(
+                url,
+                normalized,
+                request.TargetFolderId,
+                userId,
+                DownloadPaths.MissingDownloadsFolderMessage,
+                null,
+                null,
+                cancellationToken);
+        }
+
         var job = new DownloadJob
         {
             Url = url,
@@ -462,8 +476,27 @@ public sealed class DownloadService : IDownloadService
 
     private async Task<Guid> ResolveTargetFolderIdAsync(Guid? folderId, CancellationToken cancellationToken)
     {
-        _ = folderId;
-        return (await DownloadPaths.EnsureDefaultDownloadFolderAsync(_db, _paths, cancellationToken)).Id;
+        if (folderId.HasValue)
+        {
+            var folder = await _db.LibraryFolders.AsNoTracking()
+                .FirstOrDefaultAsync(f => f.Id == folderId.Value && f.Enabled, cancellationToken);
+            if (folder is not null && folder.ContentKind == ContentKind.Downloads)
+                return folder.Id;
+        }
+
+        return (await DownloadPaths.RequireDownloadsFolderAsync(_db, cancellationToken)).Id;
+    }
+
+    private static bool NeedsDownloadsLibraryFolder(string url)
+    {
+        var normalized = url.Contains("://", StringComparison.Ordinal) ? url : "https://" + url;
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
+            return true;
+
+        if (PornhubGifDownloadHelper.IsGifUrl(uri))
+            return false;
+
+        return !DownloadUrlRules.IsImageOnlyHost(uri);
     }
 
     private DownloadSiteAuthDto ToSiteAuthDto(DownloadSiteAuthConfig entry)
@@ -576,6 +609,7 @@ public sealed class DownloadService : IDownloadService
             mediaId,
             existingTitle,
             HasCover(job),
+            DownloadCoverSupport.CoverIsVideo(job),
             job.ProgressPercent,
             job.NotifyUser,
             job.CreatedAt,
@@ -613,6 +647,7 @@ public sealed class DownloadService : IDownloadService
             mediaId,
             existingTitle,
             HasCover(job),
+            DownloadCoverSupport.CoverIsVideo(job),
             job.ProgressPercent,
             job.NotifyUser,
             job.CreatedAt,
@@ -646,8 +681,7 @@ public sealed class DownloadService : IDownloadService
         return job;
     }
 
-    private static bool HasCover(DownloadJob job) =>
-        !string.IsNullOrWhiteSpace(job.CoverImagePath) && File.Exists(job.CoverImagePath);
+    private static bool HasCover(DownloadJob job) => DownloadCoverSupport.HasCover(job);
 
     private static string ResolveSiteName(DownloadJob job) =>
         !string.IsNullOrWhiteSpace(job.SourceSite)
@@ -829,7 +863,7 @@ public sealed class DownloadWorker
                 return;
             }
 
-            if (jobUri is not null && IsImageOnlyHost(jobUri))
+            if (jobUri is not null && DownloadUrlRules.IsImageOnlyHost(jobUri))
             {
                 throw new InvalidOperationException(
                     "This image site requires the Image downloader plugin. Open Settings → Plugins, confirm Image downloader is loaded, click Reload plugins, then retry.");
@@ -874,26 +908,7 @@ public sealed class DownloadWorker
 
             if (mediaItem is not null)
             {
-                var processor = scope.ServiceProvider.GetService<IDownloadMediaProcessor>();
-                if (processor is not null)
-                {
-                    await processor.ProcessCompletedDownloadAsync(
-                        mediaItem.Id,
-                        job.Url,
-                        job.MetadataJson,
-                        stoppingToken);
-                }
-                else
-                {
-                    var library = scope.ServiceProvider.GetService<ILibraryService>();
-                    if (library is not null)
-                    {
-                        await library.UpdateMetadataAsync(
-                            mediaItem.Id,
-                            new UpdateMediaMetadataRequest(null, null, job.Url, null),
-                            stoppingToken);
-                    }
-                }
+                await TryProcessCompletedDownloadAsync(scope, job, mediaItem.Id, null, stoppingToken);
             }
 
             var title = job.Title ?? TryExtractTitle(job.MetadataJson) ?? Path.GetFileNameWithoutExtension(outputPath);
@@ -1002,6 +1017,11 @@ public sealed class DownloadWorker
         if (plan is null || plan.Images.Count == 0)
             throw new InvalidOperationException($"Could not resolve images for {handler.SiteName} URL.");
 
+        job.Title = plan.Title;
+        job.SourceSite = plan.SourceSite ?? job.SourceSite;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(stoppingToken);
+
         var executor = new ImageDownloadExecutor(
             db,
             _paths,
@@ -1025,6 +1045,7 @@ public sealed class DownloadWorker
         job.BlockReason = null;
         job.RetryAfterAt = null;
         job.UpdatedAt = DateTimeOffset.UtcNow;
+        DownloadCoverSupport.TrySetCoverFromOutput(job, _paths, result.OutputPath);
         await db.SaveChangesAsync(stoppingToken);
 
         var scanner = scope.ServiceProvider.GetRequiredService<ILibraryScanner>();
@@ -1039,28 +1060,7 @@ public sealed class DownloadWorker
         await db.SaveChangesAsync(stoppingToken);
 
         if (mediaItem is not null)
-        {
-            var processor = scope.ServiceProvider.GetService<IDownloadMediaProcessor>();
-            if (processor is not null)
-            {
-                await processor.ProcessCompletedDownloadAsync(
-                    mediaItem.Id,
-                    job.Url,
-                    job.MetadataJson,
-                    stoppingToken);
-            }
-            else
-            {
-                var library = scope.ServiceProvider.GetService<ILibraryService>();
-                if (library is not null)
-                {
-                    await library.UpdateMetadataAsync(
-                        mediaItem.Id,
-                        new UpdateMediaMetadataRequest(job.Title, plan.Description, job.Url, job.MetadataJson),
-                        stoppingToken);
-                }
-            }
-        }
+            await TryProcessCompletedDownloadAsync(scope, job, mediaItem.Id, plan.Description, stoppingToken);
 
         var title = job.Title ?? Path.GetFileNameWithoutExtension(result.OutputPath);
         await _history.RecordAsync(
@@ -1072,6 +1072,52 @@ public sealed class DownloadWorker
             stoppingToken,
             createdByUserId: job.CreatedByUserId);
         await RemoveCompletedJobFromQueueAsync(db, job, stoppingToken);
+    }
+
+    private async Task TryProcessCompletedDownloadAsync(
+        IServiceScope scope,
+        DownloadJob job,
+        Guid mediaItemId,
+        string? description,
+        CancellationToken cancellationToken)
+    {
+        var processor = scope.ServiceProvider.GetService<IDownloadMediaProcessor>();
+        if (processor is not null)
+        {
+            try
+            {
+                await processor.ProcessCompletedDownloadAsync(
+                    mediaItemId,
+                    job.Url,
+                    job.MetadataJson,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Post-download processing failed for {Url}; the file was saved successfully.",
+                    job.Url);
+            }
+
+            return;
+        }
+
+        var library = scope.ServiceProvider.GetService<ILibraryService>();
+        if (library is null)
+            return;
+
+        try
+        {
+            await library.UpdateMetadataAsync(
+                mediaItemId,
+                new UpdateMediaMetadataRequest(job.Title, description, job.Url, job.MetadataJson),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Metadata update failed for {Url}", job.Url);
+        }
     }
 
     private static readonly Regex DownloadProgressRegex =
@@ -1215,7 +1261,7 @@ public sealed class DownloadWorker
             }
 
             var folderId = job.TargetFolderId
-                ?? (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, cancellationToken)).Id;
+                ?? (await DownloadPaths.RequireDownloadsFolderAsync(db, cancellationToken)).Id;
             var folder = await GetOutputFolderAsync(folderId, cancellationToken);
             Directory.CreateDirectory(folder);
 
@@ -1301,10 +1347,11 @@ public sealed class DownloadWorker
         if (folderId.HasValue)
         {
             var folder = await db.LibraryFolders.FindAsync([folderId.Value], cancellationToken);
-            if (folder is not null) return folder.Path;
+            if (folder is not null && folder.ContentKind == ContentKind.Downloads)
+                return folder.Path;
         }
 
-        return (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, cancellationToken)).Path;
+        return (await DownloadPaths.RequireDownloadsFolderAsync(db, cancellationToken)).Path;
     }
 
     private string ResolveYtDlp()
@@ -1430,8 +1477,11 @@ public sealed class DownloadWorker
 
         return null;
     }
+}
 
-    private static bool IsImageOnlyHost(Uri url)
+internal static class DownloadUrlRules
+{
+    internal static bool IsImageOnlyHost(Uri url)
     {
         var host = url.Host;
         return host.Contains("imagefap.com", StringComparison.OrdinalIgnoreCase)
@@ -1441,48 +1491,28 @@ public sealed class DownloadWorker
 
 internal static class DownloadPaths
 {
-    public static string GetDefaultDownloadDirectory(IPlatformPaths paths) =>
-        Path.Combine(paths.ProgramDataDirectory, "downloads");
+    public const string MissingDownloadsFolderMessage =
+        "No Downloads library folder is configured. Open Settings → Library, add a folder with content kind Downloads, and choose where yt-dlp videos should be saved.";
 
-    public static async Task<LibraryFolder> EnsureDefaultDownloadFolderAsync(
+    public static async Task<LibraryFolder?> FindDownloadsFolderAsync(
         CherryBoxDbContext db,
-        IPlatformPaths paths,
         CancellationToken cancellationToken)
     {
-        var configured = await db.LibraryFolders
+        var folders = await db.LibraryFolders
             .Where(f => f.Enabled && f.ContentKind == ContentKind.Downloads)
-            .OrderBy(f => f.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (configured is not null)
-            return configured;
+            .ToListAsync(cancellationToken);
 
-        var downloadPath = Path.GetFullPath(GetDefaultDownloadDirectory(paths));
-        Directory.CreateDirectory(downloadPath);
+        return folders.OrderBy(f => f.CreatedAt).FirstOrDefault();
+    }
 
-        var folders = await db.LibraryFolders.ToListAsync(cancellationToken);
-        var existing = folders.FirstOrDefault(f =>
-            string.Equals(Path.GetFullPath(f.Path), downloadPath, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
-        {
-            if (existing.ContentKind != ContentKind.Downloads)
-            {
-                existing.ContentKind = ContentKind.Downloads;
-                existing.UpdatedAt = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(cancellationToken);
-            }
+    public static async Task<LibraryFolder> RequireDownloadsFolderAsync(
+        CherryBoxDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var folder = await FindDownloadsFolderAsync(db, cancellationToken);
+        if (folder is not null)
+            return folder;
 
-            return existing;
-        }
-
-        var folder = new LibraryFolder
-        {
-            Path = downloadPath,
-            DisplayName = "Downloads",
-            ContentKind = ContentKind.Downloads,
-            Enabled = true
-        };
-        db.LibraryFolders.Add(folder);
-        await db.SaveChangesAsync(cancellationToken);
-        return folder;
+        throw new InvalidOperationException(MissingDownloadsFolderMessage);
     }
 }

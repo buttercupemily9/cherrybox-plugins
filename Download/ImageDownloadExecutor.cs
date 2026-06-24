@@ -15,7 +15,7 @@ public sealed class ImageDownloadExecutor
 {
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif"
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif", ".webm"
     };
 
     private static readonly HttpClient Http = CreateHttpClient();
@@ -105,14 +105,14 @@ public sealed class ImageDownloadExecutor
     {
         var files = new List<string>();
         var index = 0;
-        foreach (var item in plan.Images)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            index++;
-            var ext = GuessExtension(item.Url, item.FileName);
-            var fileName = SanitizeFileName(item.FileName ?? $"image-{index}{ext}");
-            var dest = Path.Combine(tempDir, fileName);
-            await DownloadFileAsync(item.Url, dest, cancellationToken);
+            foreach (var item in plan.Images)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                index++;
+                var ext = GuessExtension(item.Url, item.FileName);
+                var fileName = SanitizeFileName(item.FileName ?? $"image-{index}{ext}");
+                var dest = Path.Combine(tempDir, fileName);
+                await DownloadFileAsync(item.Url, dest, plan.SourceUrl, cancellationToken);
             if (File.Exists(dest))
                 files.Add(dest);
         }
@@ -236,31 +236,27 @@ public sealed class ImageDownloadExecutor
         return folder;
     }
 
-    private static string BuildMetadataJson(ImageDownloadPlan plan)
-    {
-        var payload = new Dictionary<string, object?>
-        {
-            ["title"] = plan.Title,
-            ["url"] = plan.SourceUrl,
-            ["webpage_url"] = plan.SourceUrl,
-            ["sourceSite"] = plan.SourceSite,
-            ["description"] = plan.Description,
-            ["downloader"] = "image-download",
-            ["imageCount"] = plan.Images.Count,
-        };
-        if (plan.Tags is { Count: > 0 })
-            payload["tags"] = plan.Tags;
+    private static string BuildMetadataJson(ImageDownloadPlan plan) =>
+        ImageDownloadMetadata.SerializePlan(plan);
 
-        return JsonSerializer.Serialize(payload);
-    }
-
-    private static async Task DownloadFileAsync(string url, string destPath, CancellationToken cancellationToken)
+    private static async Task DownloadFileAsync(
+        string url,
+        string destPath,
+        string? refererUrl,
+        CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
-            uri.Host.Contains("imagefap.com", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(refererUrl) &&
+            Uri.TryCreate(refererUrl, UriKind.Absolute, out var referer))
         {
-            request.Headers.Referrer = new Uri("https://www.imagefap.com/");
+            request.Headers.Referrer = referer;
+        }
+        else if (Uri.TryCreate(url, UriKind.Absolute, out var mediaUri))
+        {
+            if (mediaUri.Host.Contains("imagefap.com", StringComparison.OrdinalIgnoreCase))
+                request.Headers.Referrer = new Uri("https://www.imagefap.com/");
+            else if (mediaUri.Host.Contains("phncdn.com", StringComparison.OrdinalIgnoreCase))
+                request.Headers.Referrer = new Uri("https://www.pornhub.com/");
         }
 
         using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);

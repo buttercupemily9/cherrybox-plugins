@@ -61,24 +61,35 @@ public sealed class DownloadJobEnrichmentService
         var ytDlp = ResolveYtDlp();
         var coversDir = GetCoversDirectory();
         Directory.CreateDirectory(coversDir);
-        var coverPath = Path.Combine(coversDir, $"{jobId}.jpg");
 
         await FetchMetadataAsync(scope, job, url, ytDlp, cancellationToken);
         ApplyMetadataFields(job, url);
 
+        var referer = TryExtractPageUrl(job.MetadataJson) ?? url;
         if (string.IsNullOrWhiteSpace(job.CoverImagePath) || !File.Exists(job.CoverImagePath))
         {
             var thumbnailUrl = TryExtractThumbnailUrl(job.MetadataJson);
             if (!string.IsNullOrWhiteSpace(thumbnailUrl))
             {
-                await TryDownloadThumbnailFromUrlAsync(thumbnailUrl, coverPath, cancellationToken);
+                var coverPath = DownloadCoverSupport.BuildCoverPath(coversDir, jobId, thumbnailUrl);
+                await TryDownloadThumbnailFromUrlAsync(thumbnailUrl, coverPath, referer, cancellationToken);
                 if (File.Exists(coverPath))
                     job.CoverImagePath = coverPath;
             }
         }
 
-        if (string.IsNullOrWhiteSpace(job.CoverImagePath) || !File.Exists(job.CoverImagePath))
+        if ((string.IsNullOrWhiteSpace(job.CoverImagePath) || !File.Exists(job.CoverImagePath)) &&
+            IsImageDownloadUrl(url))
+        {
+            await TryFetchImageHandlerCoverAsync(scope, job, url, coversDir, cancellationToken);
+        }
+
+        if ((string.IsNullOrWhiteSpace(job.CoverImagePath) || !File.Exists(job.CoverImagePath)) &&
+            !IsImageDownloadUrl(url))
+        {
+            var coverPath = DownloadCoverSupport.BuildCoverPath(coversDir, jobId, null);
             await FetchThumbnailViaYtDlpAsync(job, url, ytDlp, coversDir, coverPath, cancellationToken);
+        }
 
         job.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
@@ -92,6 +103,12 @@ public sealed class DownloadJobEnrichmentService
         CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(job.MetadataJson))
+            return;
+
+        if (await TryEnrichFromImageHandlerAsync(scope, job, url, cancellationToken))
+            return;
+
+        if (IsImageDownloadUrl(url))
             return;
 
         var processor = scope.ServiceProvider.GetService<IDownloadMediaProcessor>();
@@ -184,14 +201,119 @@ public sealed class DownloadJobEnrichmentService
         }
     }
 
+    private async Task TryFetchImageHandlerCoverAsync(
+        IServiceScope scope,
+        DownloadJob job,
+        string url,
+        string coversDir,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseJobUri(url, out var uri))
+            return;
+
+        IImageDownloadHandler? handler = null;
+        if (PornhubGifDownloadHelper.IsGifUrl(uri))
+            handler = BuiltinPornhubGifHandler.Instance;
+        else
+            handler = scope.ServiceProvider.GetService<IImageDownloadHandlerRegistry>()?.FindHandler(uri);
+
+        if (handler is null)
+            return;
+
+        try
+        {
+            var plan = await handler.BuildPlanAsync(url, cancellationToken);
+            var imageUrl = plan?.Images.FirstOrDefault()?.Url;
+            if (string.IsNullOrWhiteSpace(imageUrl))
+                return;
+
+            var coverPath = DownloadCoverSupport.BuildCoverPath(coversDir, job.Id, imageUrl);
+            await TryDownloadThumbnailFromUrlAsync(imageUrl, coverPath, plan!.SourceUrl, cancellationToken);
+            if (File.Exists(coverPath))
+                job.CoverImagePath = coverPath;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Image handler cover fetch failed for {Url}", url);
+        }
+    }
+
+    private async Task<bool> TryEnrichFromImageHandlerAsync(
+        IServiceScope scope,
+        DownloadJob job,
+        string url,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseJobUri(url, out var uri))
+            return false;
+
+        IImageDownloadHandler? handler = null;
+        if (PornhubGifDownloadHelper.IsGifUrl(uri))
+            handler = BuiltinPornhubGifHandler.Instance;
+        else
+            handler = scope.ServiceProvider.GetService<IImageDownloadHandlerRegistry>()?.FindHandler(uri);
+
+        if (handler is null)
+            return false;
+
+        try
+        {
+            var plan = await handler.BuildPlanAsync(url, cancellationToken);
+            if (plan is null || plan.Images.Count == 0)
+                return false;
+
+            job.Title = plan.Title;
+            job.SourceSite = plan.SourceSite ?? job.SourceSite;
+            job.MetadataJson = ImageDownloadMetadata.SerializePlan(plan);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Image handler preview failed for {Url}", url);
+            return false;
+        }
+    }
+
+    private static bool TryParseJobUri(string url, out Uri uri)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out uri))
+            return true;
+
+        var normalized = url.Contains("://", StringComparison.Ordinal) ? url : "https://" + url;
+        return Uri.TryCreate(normalized, UriKind.Absolute, out uri);
+    }
+
+    private static bool IsImageDownloadUrl(string url)
+    {
+        if (!TryParseJobUri(url, out var uri))
+            return false;
+
+        if (PornhubGifDownloadHelper.IsGifUrl(uri))
+            return true;
+
+        return uri.Host.Contains("sex.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Contains("imagefap", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Contains("motherless", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Contains("rule34", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Contains("xhamster", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task TryDownloadThumbnailFromUrlAsync(
         string thumbnailUrl,
         string coverPath,
+        string? refererUrl,
         CancellationToken cancellationToken)
     {
         try
         {
-            using var response = await ThumbnailClient.GetAsync(thumbnailUrl, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, thumbnailUrl);
+            if (!string.IsNullOrWhiteSpace(refererUrl) &&
+                Uri.TryCreate(refererUrl, UriKind.Absolute, out var referer))
+            {
+                request.Headers.Referrer = referer;
+            }
+
+            using var response = await ThumbnailClient.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
                 return;
 
@@ -363,5 +485,52 @@ public sealed class DownloadJobEnrichmentService
         }
 
         return null;
+    }
+
+    private static string? TryExtractPageUrl(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(metadataJson);
+            var root = doc.RootElement;
+            foreach (var property in new[] { "webpage_url", "url", "original_url" })
+            {
+                if (!root.TryGetProperty(property, out var el))
+                    continue;
+
+                var value = el.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value;
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
+}
+
+internal static class ImageDownloadMetadata
+{
+    public static string SerializePlan(ImageDownloadPlan plan)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["title"] = plan.Title,
+            ["url"] = plan.SourceUrl,
+            ["webpage_url"] = plan.SourceUrl,
+            ["sourceSite"] = plan.SourceSite,
+            ["description"] = plan.Description,
+            ["downloader"] = "image-download",
+            ["imageCount"] = plan.Images.Count,
+        };
+        if (plan.Tags is { Count: > 0 })
+            payload["tags"] = plan.Tags;
+
+        return JsonSerializer.Serialize(payload);
     }
 }

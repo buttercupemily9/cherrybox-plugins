@@ -40,10 +40,7 @@ internal static class PornhubGifHelper
 
         var fileName = Path.GetFileName(new Uri(absoluteUrl).AbsolutePath);
         if (string.IsNullOrWhiteSpace(fileName))
-            fileName = $"gif-{gifId}.gif";
-        else if (fileName.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
-                 fileName.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
-            fileName = Path.ChangeExtension(fileName, ".gif");
+            fileName = $"gif-{gifId}.webm";
 
         return new ImageDownloadPlan(
             title,
