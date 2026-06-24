@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Text to speech</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+</head>
+<body>
+  <div class="card">
+    <h1>Text to speech</h1>
+    <p class="meta">Queue <code>.love</code> stories for Venice TTS. Completed jobs write audio to your configured folder and link it to the story.</p>
+    <div id="message" class="plugin-message" hidden></div>
+    <div id="worker-status" class="meta"></div>
+    <div class="actions">
+      <button type="button" id="start-worker">Start worker</button>
+      <button type="button" id="stop-worker" class="btn-secondary">Stop worker</button>
+      <button type="button" id="enqueue-all">Queue all unlinked stories</button>
+    </div>
+    <div class="settings-section">
+      <h2>Queue one story</h2>
+      <div class="form-row">
+        <label for="storySelect">Story</label>
+        <select id="storySelect"></select>
+      </div>
+      <button type="button" id="enqueue-one">Queue selected story</button>
+    </div>
+    <div class="settings-section">
+      <table class="data-table" id="jobs-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Story</th>
+            <th>Progress</th>
+            <th>Updated</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <script src="cherrybox/cherrybox-plugin-shell.js"></script>
+  <script src="cherrybox/cherrybox-plugin-api.js"></script>
+  <script src="plugin-api.js"></script>
+  <script src="text-to-speech-page.js"></script>
+</body>
+</html>
