@@ -11,11 +11,16 @@ public sealed class DownloadLimitService : IDownloadLimitService
 {
     private readonly CherryBoxDbContext _db;
     private readonly IConfigManager _config;
+    private readonly IDownloadHistoryStore _history;
 
-    public DownloadLimitService(CherryBoxDbContext db, IConfigManager config)
+    public DownloadLimitService(
+        CherryBoxDbContext db,
+        IConfigManager config,
+        IDownloadHistoryStore history)
     {
         _db = db;
         _config = config;
+        _history = history;
     }
 
     public async Task<DownloadLimitUsageDto?> GetUsageAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -293,12 +298,18 @@ public sealed class DownloadLimitService : IDownloadLimitService
 
     private async Task<int> CountCompletedAsync(Guid userId, DateTimeOffset periodStart, CancellationToken cancellationToken)
     {
-        var jobs = await _db.DownloadJobs
-            .AsNoTracking()
-            .Where(j => j.CreatedByUserId == userId && j.Status == DownloadJobStatus.Completed)
-            .ToListAsync(cancellationToken);
+        var historyCount = await _history.CountSuccessfulForUserSinceAsync(userId, periodStart, cancellationToken);
 
-        return jobs.Count(j => j.UpdatedAt >= periodStart);
+        // Legacy fallback for successful jobs still sitting in the queue from older versions.
+        var legacyCount = await _db.DownloadJobs
+            .AsNoTracking()
+            .CountAsync(
+                j => j.CreatedByUserId == userId &&
+                     j.Status == DownloadJobStatus.Completed &&
+                     j.UpdatedAt >= periodStart,
+                cancellationToken);
+
+        return historyCount + legacyCount;
     }
 
     private Task<int> CountInFlightAsync(Guid userId, CancellationToken cancellationToken) =>

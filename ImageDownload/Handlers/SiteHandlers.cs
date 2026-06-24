@@ -81,13 +81,26 @@ public sealed class ImagefapHandler : IImageDownloadHandler
         ImageFapHelper.BuildPlanAsync(url, cancellationToken);
 }
 
-public sealed class SexComHandler : HtmlImageDownloadHandlerBase
+public sealed class SexComHandler : IImageDownloadHandler
 {
-    public override string SiteId => "sex-com";
-    public override string SiteName => "Sex.com";
-    protected override bool Matches(Uri url) => SiteHostMatcher.HostEndsWith(url, "sex.com");
-    protected override string[] ImageSelectors =>
-        ["//img[contains(@class,'image')]", "//img[@data-src]", "//meta[@property='og:image']"];
+    public string SiteId => "sex-com";
+    public string SiteName => "Sex.com";
+
+    public bool CanHandle(Uri url) => SiteHostMatcher.HostEndsWith(url, "sex.com");
+
+    public Task<ImageDownloadPlan?> BuildPlanAsync(string url, CancellationToken cancellationToken = default) =>
+        SexComHelper.BuildPlanAsync(url, cancellationToken);
+}
+
+public sealed class PornhubGifsHandler : IImageDownloadHandler
+{
+    public string SiteId => "pornhub-gifs";
+    public string SiteName => "Pornhub";
+
+    public bool CanHandle(Uri url) => PornhubGifHelper.IsGifUrl(url);
+
+    public Task<ImageDownloadPlan?> BuildPlanAsync(string url, CancellationToken cancellationToken = default) =>
+        PornhubGifHelper.BuildPlanAsync(url, cancellationToken);
 }
 
 public sealed class PornhubAlbumsHandler : IImageDownloadHandler

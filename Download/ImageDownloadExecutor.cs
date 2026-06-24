@@ -62,31 +62,40 @@ public sealed class ImageDownloadExecutor
             if (files.Count == 0)
                 throw new InvalidOperationException("No images were downloaded.");
 
-            var isGallery = files.Count > 1;
-            var contentKind = isGallery ? ContentKind.Gallery : ContentKind.Picture;
-            var folder = await ResolveLibraryFolderAsync(contentKind, cancellationToken)
-                ?? throw new InvalidOperationException(
-                    $"No enabled library folder configured for {(isGallery ? "galleries" : "pictures")}.");
-
-            job.TargetFolderId = folder.Id;
-
-            string outputPath;
-            if (isGallery)
-            {
-                outputPath = await PackageGalleryAsync(plan.Title, files, folder.Path, cancellationToken);
-            }
-            else
-            {
-                outputPath = await MoveSingleImageAsync(plan.Title, files[0], folder.Path, cancellationToken);
-            }
-
+            var (outputPath, folderId) = await RouteDownloadedImagesAsync(files, plan.Title, cancellationToken);
             var metadataJson = BuildMetadataJson(plan);
-            return new ImageDownloadResult(outputPath, folder.Id, metadataJson, plan.Title);
+            return new ImageDownloadResult(outputPath, folderId, metadataJson, plan.Title);
         }
         finally
         {
             TryDeleteDirectory(tempDir);
         }
+    }
+
+    internal static bool AreImageFiles(IEnumerable<string> filePaths) =>
+        filePaths.All(f => ImageExtensions.Contains(Path.GetExtension(f)));
+
+    public async Task<(string OutputPath, Guid FolderId)> RouteDownloadedImagesAsync(
+        IReadOnlyList<string> sourceFiles,
+        string title,
+        CancellationToken cancellationToken)
+    {
+        if (sourceFiles.Count == 0)
+            throw new InvalidOperationException("No images were downloaded.");
+
+        var isGallery = sourceFiles.Count > 1;
+        var contentKind = isGallery ? ContentKind.Gallery : ContentKind.Picture;
+        var folder = await ResolveLibraryFolderAsync(contentKind, cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"No enabled library folder configured for {(isGallery ? "galleries" : "pictures")}.");
+
+        string outputPath;
+        if (isGallery)
+            outputPath = await PackageGalleryAsync(title, sourceFiles, folder.Path, cancellationToken);
+        else
+            outputPath = await MoveSingleImageAsync(title, sourceFiles[0], folder.Path, cancellationToken);
+
+        return (outputPath, folder.Id);
     }
 
     private async Task<IReadOnlyList<string>> DownloadDirectAsync(

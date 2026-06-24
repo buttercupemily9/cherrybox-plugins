@@ -29,13 +29,13 @@
       "id": "download",
       "folder": "Download",
       "name": "Video downloader",
-      "version": "1.2.2",
-      "description": "Queue and download videos with yt-dlp, with library scan and metadata lookup. Supports image downloads when the Image downloader add-on is installed.",
+      "version": "1.2.5",
+      "description": "Queue and download videos with yt-dlp, with library scan and metadata lookup. Built-in Pornhub GIF support; image sites via the Image downloader add-on.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Download",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Fix download service startup when resolving plugin-scoped dependencies."
+      "changelog": "Built-in Pornhub GIF downloads to Pictures; Downloads library folder guidance in UI."
     },
     {
       "id": "password-reset",
@@ -89,25 +89,25 @@
       "id": "image-download",
       "folder": "ImageDownload",
       "name": "Image downloader",
-      "version": "1.0.0",
-      "description": "Download images and galleries from Rule34, ImageFap, Pornhub albums, Motherless, xHamster photos, and more into Pictures or Galleries.",
+      "version": "1.0.5",
+      "description": "Download images and galleries from Rule34, ImageFap, Sex.com, Pornhub GIFs/albums, Motherless, xHamster photos, and more into Pictures or Galleries.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ImageDownload",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial image and gallery download support for popular image sites."
+      "changelog": "Fix Pornhub GIF webm handling and Sex.com page fetch referer."
     },
     {
       "id": "transcoder",
       "folder": "Transcoder",
       "name": "Media transcoder",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Standardize video files in-place with configurable profiles, library assignments, and a 24/7 background transcode queue.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Transcoder",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with profiles, assignments, queue worker, and batch transcode task."
+      "changelog": "Fix TranscodeApi load order on plugin settings pages."
     }
   ]
 }

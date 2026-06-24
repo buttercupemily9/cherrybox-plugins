@@ -690,12 +690,20 @@ public sealed class DownloadWorker
 
     public async Task RunAsync(CancellationToken stoppingToken)
     {
+        var cleanedCompletedOnStart = false;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
+                if (!cleanedCompletedOnStart)
+                {
+                    await CleanupCompletedJobsAsync(db, stoppingToken);
+                    cleanedCompletedOnStart = true;
+                }
+
                 try
                 {
                     await RequeueDueRetriesAsync(db, stoppingToken);
@@ -803,33 +811,43 @@ public sealed class DownloadWorker
 
         try
         {
+            Uri? jobUri = Uri.TryCreate(job.Url, UriKind.Absolute, out var parsedJobUri) ? parsedJobUri : null;
+
+            if (jobUri is not null && PornhubGifDownloadHelper.IsGifUrl(jobUri))
+            {
+                await ProcessImageJobAsync(scope, db, job, BuiltinPornhubGifHandler.Instance, stoppingToken);
+                return;
+            }
+
             var registry = _imageHandlerRegistry
                 ?? scope.ServiceProvider.GetService<IImageDownloadHandlerRegistry>();
             if (registry is not null &&
-                Uri.TryCreate(job.Url, UriKind.Absolute, out var pageUri) &&
-                registry.FindHandler(pageUri) is { } imageHandler)
+                jobUri is not null &&
+                registry.FindHandler(jobUri) is { } imageHandler)
             {
                 await ProcessImageJobAsync(scope, db, job, imageHandler, stoppingToken);
                 return;
             }
 
-            if (Uri.TryCreate(job.Url, UriKind.Absolute, out var url) &&
-                IsImageOnlyHost(url))
+            if (jobUri is not null && IsImageOnlyHost(jobUri))
             {
                 throw new InvalidOperationException(
                     "This image site requires the Image downloader plugin. Open Settings → Plugins, confirm Image downloader is loaded, click Reload plugins, then retry.");
             }
 
-            var outputPath = await RunYtDlpAsync(job, stoppingToken);
+            var download = await RunYtDlpAsync(job, stoppingToken);
             await db.Entry(job).ReloadAsync(stoppingToken);
             if (job.Status == DownloadJobStatus.Cancelled)
                 return;
 
+            var (outputPath, folderId) = await FinalizeYtDlpDownloadAsync(db, job, download, stoppingToken);
+
             job.OutputPath = outputPath;
+            job.TargetFolderId = folderId;
             job.Status = DownloadJobStatus.Completed;
             job.ProgressPercent = 100;
             job.UpdatedAt = DateTimeOffset.UtcNow;
-            job.MetadataJson = await TryLoadInfoJsonAsync(outputPath, stoppingToken) ?? job.MetadataJson;
+            job.MetadataJson = download.MetadataJson ?? job.MetadataJson;
             job.Title = TryExtractTitle(job.MetadataJson) ?? job.Title;
             job.ErrorMessage = null;
             job.BlockReason = null;
@@ -837,14 +855,6 @@ public sealed class DownloadWorker
             await db.SaveChangesAsync(stoppingToken);
 
             var scanner = scope.ServiceProvider.GetRequiredService<ILibraryScanner>();
-            var folderId = job.TargetFolderId
-                ?? (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, stoppingToken)).Id;
-            if (!job.TargetFolderId.HasValue)
-            {
-                job.TargetFolderId = folderId;
-                await db.SaveChangesAsync(stoppingToken);
-            }
-
             await scanner.ScanFolderAsync(folderId, stoppingToken);
 
             var mediaItem = await db.MediaItems.FirstOrDefaultAsync(
@@ -893,7 +903,9 @@ public sealed class DownloadWorker
                 title,
                 outputPath,
                 mediaItem?.Id,
-                stoppingToken);
+                stoppingToken,
+                createdByUserId: job.CreatedByUserId);
+            await RemoveCompletedJobFromQueueAsync(db, job, stoppingToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -940,7 +952,8 @@ public sealed class DownloadWorker
             null,
             stoppingToken,
             job.ErrorMessage,
-            failed: true);
+            failed: true,
+            createdByUserId: job.CreatedByUserId);
 
         DownloadJobFileCleanup.RemoveCover(job);
         db.DownloadJobs.Remove(job);
@@ -949,6 +962,33 @@ public sealed class DownloadWorker
             "Download removed from queue after {MaxRetries} auto-retries: {Url}",
             MaxAutoRetryAttempts,
             job.Url);
+    }
+
+    private static async Task RemoveCompletedJobFromQueueAsync(
+        CherryBoxDbContext db,
+        DownloadJob job,
+        CancellationToken stoppingToken)
+    {
+        DownloadJobFileCleanup.RemoveCover(job);
+        db.DownloadJobs.Remove(job);
+        await db.SaveChangesAsync(stoppingToken);
+    }
+
+    private static async Task CleanupCompletedJobsAsync(
+        CherryBoxDbContext db,
+        CancellationToken stoppingToken)
+    {
+        var completed = await db.DownloadJobs
+            .Where(j => j.Status == DownloadJobStatus.Completed)
+            .ToListAsync(stoppingToken);
+        if (completed.Count == 0)
+            return;
+
+        foreach (var job in completed)
+            DownloadJobFileCleanup.RemoveCover(job);
+
+        db.DownloadJobs.RemoveRange(completed);
+        await db.SaveChangesAsync(stoppingToken);
     }
 
     private async Task ProcessImageJobAsync(
@@ -1029,7 +1069,9 @@ public sealed class DownloadWorker
             title,
             result.OutputPath,
             mediaItem?.Id,
-            stoppingToken);
+            stoppingToken,
+            createdByUserId: job.CreatedByUserId);
+        await RemoveCompletedJobFromQueueAsync(db, job, stoppingToken);
     }
 
     private static readonly Regex DownloadProgressRegex =
@@ -1068,90 +1110,146 @@ public sealed class DownloadWorker
         return scene is null ? null : JsonSerializer.Serialize(scene);
     }
 
-    private async Task<string> RunYtDlpAsync(DownloadJob job, CancellationToken cancellationToken)
+    private async Task<YtDlpDownloadResult> RunYtDlpAsync(DownloadJob job, CancellationToken cancellationToken)
     {
         await EnsureYtDlpAvailableAsync(cancellationToken);
         var ytDlp = ResolveYtDlp();
 
-        var folderId = job.TargetFolderId;
-        if (!folderId.HasValue)
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
-            folderId = (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, cancellationToken)).Id;
-        }
+        var tempDir = Path.Combine(Path.GetTempPath(), "cherrybox-ytdlp", job.Id.ToString("N"));
+        Directory.CreateDirectory(tempDir);
 
-        var folder = await GetOutputFolderAsync(folderId, cancellationToken);
-        Directory.CreateDirectory(folder);
-
-        var outputTemplate = Path.Combine(folder, "%(title)s [%(id)s].%(ext)s");
-        var args = new List<string>
-        {
-            "-o",
-            outputTemplate,
-            "--write-info-json",
-            "--progress",
-            "--newline"
-        };
-
-        var ffmpegDir = ResolveFfmpegDirectory();
-        if (!string.IsNullOrWhiteSpace(ffmpegDir))
-        {
-            args.Add("--ffmpeg-location");
-            args.Add(ffmpegDir);
-        }
-
-        var siteAuth = YtDlpAuthHelper.MatchSiteAuth(job.Url, _configManager.Current.Download.SiteAuth);
-        if (siteAuth is not null)
-            YtDlpAuthHelper.AppendAuthArguments(args, siteAuth, _paths);
-
-        args.Add(job.Url);
-
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = ytDlp,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
-        foreach (var argument in args)
-            process.StartInfo.ArgumentList.Add(argument);
-
-        process.Start();
-        _jobTracker.Register(job.Id, process);
         try
         {
-            var stderrBuilder = new StringBuilder();
-            var progressTask = TrackDownloadProgressAsync(process.StandardError, job.Id, stderrBuilder, cancellationToken);
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            await Task.WhenAll(progressTask, stdoutTask);
-            await process.WaitForExitAsync(cancellationToken);
+            var outputTemplate = Path.Combine(tempDir, "%(title)s [%(id)s].%(ext)s");
+            var args = new List<string>
+            {
+                "-o",
+                outputTemplate,
+                "--write-info-json",
+                "--progress",
+                "--newline"
+            };
 
-            var stderr = stderrBuilder.ToString();
-            if (process.ExitCode != 0)
-                throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr)
-                    ? "yt-dlp exited with non-zero code"
-                    : stderr.Trim());
+            var ffmpegDir = ResolveFfmpegDirectory();
+            if (!string.IsNullOrWhiteSpace(ffmpegDir))
+            {
+                args.Add("--ffmpeg-location");
+                args.Add(ffmpegDir);
+            }
+
+            var siteAuth = YtDlpAuthHelper.MatchSiteAuth(job.Url, _configManager.Current.Download.SiteAuth);
+            if (siteAuth is not null)
+                YtDlpAuthHelper.AppendAuthArguments(args, siteAuth, _paths);
+
+            args.Add(job.Url);
+
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = ytDlp,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            foreach (var argument in args)
+                process.StartInfo.ArgumentList.Add(argument);
+
+            process.Start();
+            _jobTracker.Register(job.Id, process);
+            try
+            {
+                var stderrBuilder = new StringBuilder();
+                var progressTask = TrackDownloadProgressAsync(process.StandardError, job.Id, stderrBuilder, cancellationToken);
+                var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+                await Task.WhenAll(progressTask, stdoutTask);
+                await process.WaitForExitAsync(cancellationToken);
+
+                var stderr = stderrBuilder.ToString();
+                if (process.ExitCode != 0)
+                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(stderr)
+                        ? "yt-dlp exited with non-zero code"
+                        : stderr.Trim());
+            }
+            finally
+            {
+                _jobTracker.Unregister(job.Id);
+            }
+
+            var files = Directory.GetFiles(tempDir)
+                .Where(f => !f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (files.Count == 0)
+                throw new InvalidOperationException("No file downloaded");
+
+            var metadataJson = await TryLoadInfoJsonFromDownloadAsync(files[0], cancellationToken);
+            return new YtDlpDownloadResult(files, metadataJson);
+        }
+        catch
+        {
+            TryDeleteDownloadTempDirectory(tempDir);
+            throw;
+        }
+    }
+
+    private async Task<(string OutputPath, Guid FolderId)> FinalizeYtDlpDownloadAsync(
+        CherryBoxDbContext db,
+        DownloadJob job,
+        YtDlpDownloadResult download,
+        CancellationToken cancellationToken)
+    {
+        var tempDir = download.Files.Count > 0 ? Path.GetDirectoryName(download.Files[0]) : null;
+        try
+        {
+            if (ImageDownloadExecutor.AreImageFiles(download.Files))
+            {
+                var title = job.Title
+                    ?? TryExtractTitle(download.MetadataJson)
+                    ?? Path.GetFileNameWithoutExtension(download.Files[0]);
+                var executor = new ImageDownloadExecutor(db, _paths, _configManager, _jobTracker, _ytDlpInstaller);
+                return await executor.RouteDownloadedImagesAsync(download.Files, title, cancellationToken);
+            }
+
+            var folderId = job.TargetFolderId
+                ?? (await DownloadPaths.EnsureDefaultDownloadFolderAsync(db, _paths, cancellationToken)).Id;
+            var folder = await GetOutputFolderAsync(folderId, cancellationToken);
+            Directory.CreateDirectory(folder);
+
+            var movedFiles = new List<string>();
+            foreach (var file in download.Files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var dest = UniqueDownloadPath(Path.Combine(folder, Path.GetFileName(file)));
+                File.Move(file, dest, overwrite: false);
+                movedFiles.Add(dest);
+
+                var infoJson = Path.ChangeExtension(file, ".info.json");
+                if (File.Exists(infoJson))
+                {
+                    var infoDest = Path.ChangeExtension(dest, ".info.json");
+                    if (!File.Exists(infoDest))
+                        File.Move(infoJson, infoDest, overwrite: false);
+                }
+            }
+
+            var outputPath = movedFiles
+                .OrderByDescending(f => new FileInfo(f).LastWriteTimeUtc)
+                .First();
+
+            return (outputPath, folderId);
         }
         finally
         {
-            _jobTracker.Unregister(job.Id);
+            if (!string.IsNullOrWhiteSpace(tempDir))
+                TryDeleteDownloadTempDirectory(tempDir);
         }
-
-        var downloaded = Directory.GetFiles(folder)
-            .Where(f => !f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(f => new FileInfo(f).LastWriteTimeUtc)
-            .FirstOrDefault();
-
-        if (downloaded is null)
-            throw new InvalidOperationException("No file downloaded");
-
-        return downloaded;
     }
+
+    private sealed record YtDlpDownloadResult(IReadOnlyList<string> Files, string? MetadataJson);
 
     private async Task TrackDownloadProgressAsync(
         StreamReader stderr,
@@ -1269,6 +1367,45 @@ public sealed class DownloadWorker
         return null;
     }
 
+    private static async Task<string?> TryLoadInfoJsonFromDownloadAsync(string outputPath, CancellationToken cancellationToken)
+    {
+        var jsonPath = Path.ChangeExtension(outputPath, ".info.json");
+        if (!File.Exists(jsonPath))
+            return null;
+
+        return await File.ReadAllTextAsync(jsonPath, cancellationToken);
+    }
+
+    private static string UniqueDownloadPath(string path)
+    {
+        if (!File.Exists(path))
+            return path;
+
+        var dir = Path.GetDirectoryName(path)!;
+        var name = Path.GetFileNameWithoutExtension(path);
+        var ext = Path.GetExtension(path);
+        for (var i = 2; i < 1000; i++)
+        {
+            var candidate = Path.Combine(dir, $"{name} ({i}){ext}");
+            if (!File.Exists(candidate))
+                return candidate;
+        }
+
+        return Path.Combine(dir, $"{name}-{Guid.NewGuid():N}{ext}");
+    }
+
+    private static void TryDeleteDownloadTempDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch
+        {
+        }
+    }
+
     private static async Task<string?> TryLoadInfoJsonAsync(string outputPath, CancellationToken cancellationToken)
     {
         var jsonPath = Path.ChangeExtension(outputPath, ".info.json");
@@ -1312,6 +1449,13 @@ internal static class DownloadPaths
         IPlatformPaths paths,
         CancellationToken cancellationToken)
     {
+        var configured = await db.LibraryFolders
+            .Where(f => f.Enabled && f.ContentKind == ContentKind.Downloads)
+            .OrderBy(f => f.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (configured is not null)
+            return configured;
+
         var downloadPath = Path.GetFullPath(GetDefaultDownloadDirectory(paths));
         Directory.CreateDirectory(downloadPath);
 
@@ -1319,13 +1463,22 @@ internal static class DownloadPaths
         var existing = folders.FirstOrDefault(f =>
             string.Equals(Path.GetFullPath(f.Path), downloadPath, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
+        {
+            if (existing.ContentKind != ContentKind.Downloads)
+            {
+                existing.ContentKind = ContentKind.Downloads;
+                existing.UpdatedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             return existing;
+        }
 
         var folder = new LibraryFolder
         {
             Path = downloadPath,
             DisplayName = "Downloads",
-            ContentKind = ContentKind.Video,
+            ContentKind = ContentKind.Downloads,
             Enabled = true
         };
         db.LibraryFolders.Add(folder);

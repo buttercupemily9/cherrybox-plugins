@@ -9,6 +9,7 @@
   <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
   <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
   <script src="plugin-api.js" defer></script>
+  <script src="profiles-page.js" defer></script>
 </head>
 <body>
   <div class="card">
@@ -61,109 +62,5 @@
       </form>
     </div>
   </div>
-  <script>
-    const msg = document.getElementById('message');
-    const tbody = document.querySelector('#profiles-table tbody');
-    const editor = document.getElementById('editor');
-    function showMessage(text, kind = 'success') {
-      msg.textContent = text;
-      msg.className = `plugin-message ${kind}`;
-      msg.hidden = false;
-    }
-    function pascalToCamel(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
-    function readForm() {
-      return {
-        name: document.getElementById('name').value.trim(),
-        container: document.getElementById('container').value,
-        video: {
-          codec: document.getElementById('videoCodec').value,
-          rateControl: document.getElementById('rateControl').value,
-          crf: Number(document.getElementById('crf').value) || null,
-          bitrateKbps: Number(document.getElementById('videoBitrate').value) || null,
-          maxWidth: Number(document.getElementById('maxWidth').value) || null,
-          maxHeight: Number(document.getElementById('maxHeight').value) || null,
-        },
-        audio: {
-          codec: document.getElementById('audioCodec').value,
-          channels: Number(document.getElementById('channels').value) || 2,
-          bitrateKbps: Number(document.getElementById('audioBitrate').value) || 128,
-          sampleRateHz: Number(document.getElementById('sampleRate').value) || 48000,
-        },
-        fileSizeTargetMB: Number(document.getElementById('fileSizeTarget').value) || null,
-        skipIfCompatible: document.getElementById('skipIfCompatible').checked,
-      };
-    }
-    function fillForm(profile) {
-      document.getElementById('profile-id').value = profile?.id || '';
-      document.getElementById('name').value = profile?.name || '';
-      document.getElementById('container').value = pascalToCamel(profile?.container || 'mp4');
-      document.getElementById('videoCodec').value = pascalToCamel(profile?.video?.codec || 'h264');
-      document.getElementById('rateControl').value = pascalToCamel(profile?.video?.rateControl || 'quality');
-      document.getElementById('crf').value = profile?.video?.crf ?? 23;
-      document.getElementById('videoBitrate').value = profile?.video?.bitrateKbps ?? '';
-      document.getElementById('fileSizeTarget').value = profile?.fileSizeTargetMB ?? '';
-      document.getElementById('maxWidth').value = profile?.video?.maxWidth ?? 1920;
-      document.getElementById('maxHeight').value = profile?.video?.maxHeight ?? 1080;
-      document.getElementById('audioCodec').value = pascalToCamel(profile?.audio?.codec || 'aac');
-      document.getElementById('channels').value = profile?.audio?.channels ?? 2;
-      document.getElementById('audioBitrate').value = profile?.audio?.bitrateKbps ?? 128;
-      document.getElementById('sampleRate').value = profile?.audio?.sampleRateHz ?? 48000;
-      document.getElementById('skipIfCompatible').checked = profile?.skipIfCompatible ?? true;
-      document.getElementById('editor-title').textContent = profile ? 'Edit profile' : 'New profile';
-      editor.hidden = false;
-    }
-    async function refresh() {
-      const profiles = await TranscodeApi.listProfiles();
-      tbody.innerHTML = profiles.map(p => `<tr>
-        <td>${p.name}</td><td>${p.container}</td><td>${p.video.codec}</td><td>${p.audio.codec}</td>
-        <td>
-          <button type="button" data-edit="${p.id}">Edit</button>
-          <button type="button" data-export="${p.id}">Export</button>
-          <button type="button" data-delete="${p.id}">Delete</button>
-        </td></tr>`).join('');
-    }
-    document.getElementById('new-btn').onclick = () => fillForm(null);
-    document.getElementById('cancel-btn').onclick = () => { editor.hidden = true; };
-    document.getElementById('profile-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const body = readForm();
-      const id = document.getElementById('profile-id').value;
-      if (id) await TranscodeApi.updateProfile(id, body); else await TranscodeApi.createProfile(body);
-      editor.hidden = true;
-      showMessage('Profile saved.');
-      await refresh();
-    };
-    document.getElementById('import-file').onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const text = await file.text();
-      await TranscodeApi.importProfile(text);
-      showMessage('Profile imported.');
-      await refresh();
-    };
-    tbody.onclick = async (e) => {
-      const edit = e.target.getAttribute('data-edit');
-      const del = e.target.getAttribute('data-delete');
-      const exp = e.target.getAttribute('data-export');
-      if (edit) {
-        const profiles = await TranscodeApi.listProfiles();
-        fillForm(profiles.find(p => p.id === edit));
-      }
-      if (del && confirm('Delete this profile?')) {
-        await TranscodeApi.deleteProfile(del);
-        showMessage('Profile deleted.');
-        await refresh();
-      }
-      if (exp) {
-        const data = await TranscodeApi.exportProfile(exp);
-        const blob = new Blob([data.json], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'transcode-profile.json';
-        a.click();
-      }
-    };
-    refresh().catch(err => showMessage(err.message, 'error'));
-  </script>
 </body>
 </html>

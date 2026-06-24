@@ -11,7 +11,7 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "download";
     public string Name => "Video downloader";
-    public string Version => "1.2.2";
+    public string Version => "1.2.4";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -55,10 +55,17 @@ public sealed class DownloadPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterSupportAppUpdater(ytDlpInstaller);
     }
 
-    private static DownloadLimitService CreateDownloadLimitService(IServiceProvider sp) =>
-        new(
+    private static DownloadLimitService CreateDownloadLimitService(IServiceProvider sp)
+    {
+        var registry = sp.GetRequiredService<IPluginServiceRegistry>();
+        var history = registry.Resolve<IDownloadHistoryStore>(sp)
+            ?? registry.Resolve<DownloadHistoryStore>(sp)
+            ?? throw new InvalidOperationException("Download history store is not registered.");
+        return new DownloadLimitService(
             sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
-            sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>());
+            sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
+            history);
+    }
 
     public async Task StartAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
