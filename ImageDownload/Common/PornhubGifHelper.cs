@@ -25,10 +25,10 @@ internal static class PornhubGifHelper
 
         var contentUrl = UnescapeJson(ContentUrlRegex.Match(html).Groups[1].Value);
         if (string.IsNullOrWhiteSpace(contentUrl))
-            return YtDlpPlanHelper.BuildYtDlpPlan(pageUri.ToString(), "Pornhub");
+            return null;
 
         if (!HtmlGalleryScraper.TryNormalizeImageUrl(contentUrl, pageUri, out var absoluteUrl))
-            return YtDlpPlanHelper.BuildYtDlpPlan(pageUri.ToString(), "Pornhub");
+            return null;
 
         var doc = new HtmlDocument();
         doc.LoadHtml(html);
@@ -41,6 +41,9 @@ internal static class PornhubGifHelper
         var fileName = Path.GetFileName(new Uri(absoluteUrl).AbsolutePath);
         if (string.IsNullOrWhiteSpace(fileName))
             fileName = $"gif-{gifId}.gif";
+        else if (fileName.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
+                 fileName.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+            fileName = Path.ChangeExtension(fileName, ".gif");
 
         return new ImageDownloadPlan(
             title,

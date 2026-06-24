@@ -811,18 +811,25 @@ public sealed class DownloadWorker
 
         try
         {
+            Uri? jobUri = Uri.TryCreate(job.Url, UriKind.Absolute, out var parsedJobUri) ? parsedJobUri : null;
+
+            if (jobUri is not null && PornhubGifDownloadHelper.IsGifUrl(jobUri))
+            {
+                await ProcessImageJobAsync(scope, db, job, BuiltinPornhubGifHandler.Instance, stoppingToken);
+                return;
+            }
+
             var registry = _imageHandlerRegistry
                 ?? scope.ServiceProvider.GetService<IImageDownloadHandlerRegistry>();
             if (registry is not null &&
-                Uri.TryCreate(job.Url, UriKind.Absolute, out var pageUri) &&
-                registry.FindHandler(pageUri) is { } imageHandler)
+                jobUri is not null &&
+                registry.FindHandler(jobUri) is { } imageHandler)
             {
                 await ProcessImageJobAsync(scope, db, job, imageHandler, stoppingToken);
                 return;
             }
 
-            if (Uri.TryCreate(job.Url, UriKind.Absolute, out var url) &&
-                IsImageOnlyHost(url))
+            if (jobUri is not null && IsImageOnlyHost(jobUri))
             {
                 throw new InvalidOperationException(
                     "This image site requires the Image downloader plugin. Open Settings → Plugins, confirm Image downloader is loaded, click Reload plugins, then retry.");
@@ -1442,6 +1449,13 @@ internal static class DownloadPaths
         IPlatformPaths paths,
         CancellationToken cancellationToken)
     {
+        var configured = await db.LibraryFolders
+            .Where(f => f.Enabled && f.ContentKind == ContentKind.Downloads)
+            .OrderBy(f => f.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (configured is not null)
+            return configured;
+
         var downloadPath = Path.GetFullPath(GetDefaultDownloadDirectory(paths));
         Directory.CreateDirectory(downloadPath);
 
@@ -1449,13 +1463,22 @@ internal static class DownloadPaths
         var existing = folders.FirstOrDefault(f =>
             string.Equals(Path.GetFullPath(f.Path), downloadPath, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
+        {
+            if (existing.ContentKind != ContentKind.Downloads)
+            {
+                existing.ContentKind = ContentKind.Downloads;
+                existing.UpdatedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             return existing;
+        }
 
         var folder = new LibraryFolder
         {
             Path = downloadPath,
             DisplayName = "Downloads",
-            ContentKind = ContentKind.Video,
+            ContentKind = ContentKind.Downloads,
             Enabled = true
         };
         db.LibraryFolders.Add(folder);

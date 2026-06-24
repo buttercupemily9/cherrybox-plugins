@@ -14,7 +14,8 @@
 <body>
   <div class="card download-page">
     <h1>Downloads</h1>
-    <p class="meta">Queue URLs for yt-dlp and supported image sites. You only see downloads you queued on this account. Videos save to Downloads; single images and GIFs save to Pictures; multi-image or multi-GIF sets save to Galleries. Supported GIF URLs include Pornhub <code>/gif/…</code> and Sex.com <code>/gifs/…</code> (with the Image downloader add-on).</p>
+    <p class="meta">Queue URLs for yt-dlp and supported image sites. You only see downloads you queued on this account. Queued <strong>videos</strong> save to a <strong>Downloads</strong> library folder (Settings → Library → Library folders). Pornhub <code>/gif/…</code> URLs save as GIFs to <strong>Picture</strong> folders. Other single images and GIFs save to Pictures; multi-image sets save to Galleries.</p>
+    <p class="meta plugin-message error" id="library-folder-hint" hidden></p>
     <p class="meta" id="limit-summary" hidden></p>
     <div id="message" class="plugin-message" hidden></div>
 
@@ -56,6 +57,29 @@
       var api = ui.api;
       var showMessage = ui.showMessage;
       var messageEl = document.getElementById('message');
+      var libraryHintEl = document.getElementById('library-folder-hint');
+
+      async function refreshLibraryFolderHint() {
+        if (!libraryHintEl || !api.listFolders) return;
+        try {
+          var folders = await api.listFolders();
+          var hasDownloads = (folders || []).some(function (f) {
+            return f.enabled !== false && String(f.contentKind) === 'Downloads';
+          });
+          if (hasDownloads) {
+            libraryHintEl.hidden = true;
+            libraryHintEl.textContent = '';
+            return;
+          }
+          libraryHintEl.hidden = false;
+          libraryHintEl.textContent =
+            'No Downloads library folder is configured. Add a folder with content kind Downloads under Settings → Library → Library folders (or use Create starter folders during setup). Queued videos need that folder.';
+        } catch {
+          libraryHintEl.hidden = true;
+        }
+      }
+
+      void refreshLibraryFolderHint();
       var queuePanel = window.DownloadQueuePanel.mount(
         document.getElementById('queue-panel'),
         messageEl,

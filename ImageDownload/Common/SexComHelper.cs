@@ -26,7 +26,10 @@ internal static class SexComHelper
         if (IsGifPage(pageUri))
             return await BuildGifPlanAsync(pageUri, cancellationToken);
 
-        var html = await ImageFetchHelper.GetStringAsync(pageUri.ToString(), cancellationToken);
+        var html = await ImageFetchHelper.GetStringAsync(
+            pageUri.ToString(),
+            cancellationToken,
+            referer: "https://www.sex.com/");
 
         if (LooksLikeVideoPage(pageUri, html))
             return YtDlpPlanHelper.BuildYtDlpPlan(pageUri.ToString(), "Sex.com");
