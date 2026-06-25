@@ -2,17 +2,45 @@ using CherryBox.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
-namespace CherryBox.PasswordReset.Plugin;
+namespace CherryBox.Email.Plugin;
 
 internal sealed class UserEmailStore
 {
     private readonly string _connectionString;
+    private readonly string _dbPath;
 
     public UserEmailStore(string dataDirectory)
     {
         Directory.CreateDirectory(dataDirectory);
-        _connectionString = $"Data Source={Path.Combine(dataDirectory, "user-emails.db")}";
+        _dbPath = Path.Combine(dataDirectory, "user-emails.db");
+        _connectionString = $"Data Source={_dbPath}";
         EnsureSchema();
+    }
+
+    public void EnsureSchema()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS UserEmails (
+                UserId TEXT NOT NULL PRIMARY KEY,
+                Email TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_UserEmails_Email ON UserEmails (Email);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    public bool HasAnyEmails()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(1) FROM UserEmails;";
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
     public async Task ImportLegacyEmailsAsync(CherryBoxDbContext db, CancellationToken cancellationToken = default)
@@ -121,22 +149,5 @@ internal sealed class UserEmailStore
         }
 
         return false;
-    }
-
-    private void EnsureSchema()
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            CREATE TABLE IF NOT EXISTS UserEmails (
-                UserId TEXT NOT NULL PRIMARY KEY,
-                Email TEXT NOT NULL,
-                UpdatedAt TEXT NOT NULL
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS IX_UserEmails_Email ON UserEmails (Email);
-            """;
-        command.ExecuteNonQuery();
     }
 }

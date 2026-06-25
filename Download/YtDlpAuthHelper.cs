@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using CherryBox.Core.Configuration;
 using CherryBox.Core.Platform;
 
@@ -6,42 +5,18 @@ namespace CherryBox.Download.Plugin;
 
 internal static class YtDlpAuthHelper
 {
-    public const string AuthDirectoryName = "download-auth";
-
-    public static string NormalizeSiteKey(string siteKey)
-    {
-        if (string.IsNullOrWhiteSpace(siteKey))
-            return string.Empty;
-
-        return new string(siteKey.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-    }
-
-    public static string GetCookiesFilePath(IPlatformPaths paths, string siteKey) =>
-        Path.Combine(paths.ProgramDataDirectory, AuthDirectoryName, NormalizeSiteKey(siteKey), "cookies.txt");
-
-    public static DownloadSiteAuthConfig? MatchSiteAuth(string url, IEnumerable<DownloadSiteAuthConfig> entries)
-    {
-        foreach (var entry in entries)
-        {
-            if (string.IsNullOrWhiteSpace(entry.SiteKey))
-                continue;
-
-            if (url.Contains(entry.SiteKey, StringComparison.OrdinalIgnoreCase))
-                return entry;
-        }
-
-        return null;
-    }
+    public static SiteAuthEntryConfig? MatchSiteAuth(string url, IEnumerable<SiteAuthEntryConfig> entries) =>
+        SiteAuthHelper.MatchSiteAuth(url, entries);
 
     public static void AppendAuthArguments(
         ICollection<string> arguments,
-        DownloadSiteAuthConfig entry,
+        SiteAuthEntryConfig entry,
         IPlatformPaths paths)
     {
-        if (string.Equals(entry.AuthMode, DownloadSiteAuthModes.Cookies, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(entry.AuthMode, SiteAuthModes.Cookies, StringComparison.OrdinalIgnoreCase))
         {
-            var cookiesPath = GetCookiesFilePath(paths, entry.SiteKey);
-            if (!File.Exists(cookiesPath))
+            var cookiesPath = SiteAuthHelper.ResolveCookiesFilePath(paths, entry.SiteKey);
+            if (cookiesPath is null || !File.Exists(cookiesPath))
                 throw new InvalidOperationException($"Cookie file not found for {entry.SiteKey}.");
 
             arguments.Add("--cookies");
@@ -63,9 +38,9 @@ internal static class YtDlpAuthHelper
         IReadOnlyList<string> arguments,
         CancellationToken cancellationToken)
     {
-        using var process = new Process
+        using var process = new System.Diagnostics.Process
         {
-            StartInfo = new ProcessStartInfo
+            StartInfo = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = ytDlpPath,
                 RedirectStandardOutput = true,

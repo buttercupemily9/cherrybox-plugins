@@ -13,8 +13,7 @@ internal sealed class PasswordResetService : IPasswordResetService
     private readonly IAuthService _auth;
     private readonly PasswordResetSettingsStore _settingsStore;
     private readonly ResetTokenStore _tokenStore;
-    private readonly UserEmailStore _emailStore;
-    private readonly SmtpEmailSender _emailSender;
+    private readonly IEmailService _emailService;
     private readonly ILogger<PasswordResetService> _logger;
 
     public PasswordResetService(
@@ -22,25 +21,23 @@ internal sealed class PasswordResetService : IPasswordResetService
         IAuthService auth,
         PasswordResetSettingsStore settingsStore,
         ResetTokenStore tokenStore,
-        UserEmailStore emailStore,
-        SmtpEmailSender emailSender,
+        IEmailService emailService,
         ILogger<PasswordResetService> logger)
     {
         _db = db;
         _auth = auth;
         _settingsStore = settingsStore;
         _tokenStore = tokenStore;
-        _emailStore = emailStore;
-        _emailSender = emailSender;
+        _emailService = emailService;
         _logger = logger;
     }
 
     public PasswordResetStatusDto GetStatus()
     {
         var settings = _settingsStore.Get();
+        var emailConfigured = _emailService.GetStatus().Configured;
         var configured = settings.Enabled
-            && !string.IsNullOrWhiteSpace(settings.SmtpHost)
-            && !string.IsNullOrWhiteSpace(settings.FromAddress)
+            && emailConfigured
             && !string.IsNullOrWhiteSpace(settings.PublicBaseUrl);
         return new PasswordResetStatusDto(true, configured);
     }
@@ -51,7 +48,9 @@ internal sealed class PasswordResetService : IPasswordResetService
         return Task.FromResult(ToDto(settings));
     }
 
-    public Task<PasswordResetSettingsDto> UpdateSettingsAsync(UpdatePasswordResetSettingsRequest request, CancellationToken cancellationToken = default)
+    public Task<PasswordResetSettingsDto> UpdateSettingsAsync(
+        UpdatePasswordResetSettingsRequest request,
+        CancellationToken cancellationToken = default)
     {
         if (request is null)
             throw new InvalidOperationException("Request body is required.");
@@ -59,46 +58,26 @@ internal sealed class PasswordResetService : IPasswordResetService
         if (request.TokenLifetimeMinutes < 5 || request.TokenLifetimeMinutes > 24 * 60)
             throw new InvalidOperationException("Token lifetime must be between 5 and 1440 minutes.");
 
-        var current = _settingsStore.Get();
-        var next = MergeSettings(request, current);
+        var next = new PasswordResetSettings
+        {
+            Enabled = request.Enabled,
+            PublicBaseUrl = request.PublicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty,
+            TokenLifetimeMinutes = request.TokenLifetimeMinutes
+        };
 
         _settingsStore.Save(next);
         return Task.FromResult(ToDto(next));
     }
 
-    public async Task SendTestEmailAsync(
-        string toAddress,
-        UpdatePasswordResetSettingsRequest? draftSettings = null,
-        CancellationToken cancellationToken = default)
-    {
-        var current = _settingsStore.Get();
-        var settings = draftSettings is null ? current : MergeSettings(draftSettings, current);
-        ValidateSendSettings(settings, requirePublicBaseUrl: false);
-
-        if (!string.IsNullOrWhiteSpace(settings.Username) && string.IsNullOrWhiteSpace(settings.Password))
-            throw new InvalidOperationException("SMTP password is required to send a test email.");
-
-        await _emailSender.SendAsync(
-            settings,
-            toAddress,
-            "CherryBox password reset test",
-            "This is a test email from the CherryBox password reset plugin.",
-            cancellationToken);
-    }
-
     public async Task RequestResetAsync(string usernameOrEmail, CancellationToken cancellationToken = default)
     {
         var settings = _settingsStore.Get();
-        if (!settings.Enabled)
+        if (!settings.Enabled || !_emailService.GetStatus().Configured)
             return;
 
-        try
+        if (string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
         {
-            ValidateSendSettings(settings);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Password reset requested but SMTP is not configured.");
+            _logger.LogWarning("Password reset requested but public base URL is not configured.");
             return;
         }
 
@@ -137,12 +116,10 @@ internal sealed class PasswordResetService : IPasswordResetService
             This link expires in {settings.TokenLifetimeMinutes} minutes. If you did not request a reset, you can ignore this email.
             """;
 
-        await _emailSender.SendAsync(
-            settings,
+        await _emailService.SendAsync(new SendEmailRequest(
             email,
             "Reset your CherryBox password",
-            body,
-            cancellationToken);
+            body), cancellationToken);
 
         _logger.LogInformation("Password reset email queued for user {UserId}", user.Id);
     }
@@ -159,18 +136,9 @@ internal sealed class PasswordResetService : IPasswordResetService
         return await _auth.SetPasswordAsync(userId.Value, newPassword, cancellationToken);
     }
 
-    public Task<string?> GetUserEmailAsync(Guid userId, CancellationToken cancellationToken = default) =>
-        _emailStore.GetAsync(userId, cancellationToken);
-
-    public Task SetUserEmailAsync(Guid userId, string? email, CancellationToken cancellationToken = default) =>
-        _emailStore.SetAsync(userId, email, cancellationToken);
-
-    public Task<Guid?> FindUserIdByEmailAsync(string email, CancellationToken cancellationToken = default) =>
-        _emailStore.FindUserIdByEmailAsync(email, cancellationToken);
-
     private async Task<User?> FindUserByEmailAsync(string email, CancellationToken cancellationToken)
     {
-        var userId = await _emailStore.FindUserIdByEmailAsync(email, cancellationToken);
+        var userId = await _emailService.FindUserIdByEmailAsync(email, cancellationToken);
         if (userId is null)
             return null;
 
@@ -180,49 +148,15 @@ internal sealed class PasswordResetService : IPasswordResetService
 
     private async Task<string?> ResolveEmailAsync(Guid userId, string username, CancellationToken cancellationToken)
     {
-        var email = await _emailStore.GetAsync(userId, cancellationToken);
+        var email = await _emailService.GetUserEmailAsync(userId, cancellationToken);
         if (!string.IsNullOrWhiteSpace(email))
             return email.Trim();
 
         return username.Contains('@', StringComparison.Ordinal) ? username.Trim() : null;
     }
 
-    private static PasswordResetSettings MergeSettings(UpdatePasswordResetSettingsRequest request, PasswordResetSettings current) =>
-        new()
-        {
-            Enabled = request.Enabled,
-            SmtpHost = request.SmtpHost?.Trim() ?? string.Empty,
-            SmtpPort = request.SmtpPort,
-            UseTls = request.UseTls,
-            Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
-            Password = string.IsNullOrWhiteSpace(request.Password) ? current.Password : request.Password,
-            FromAddress = request.FromAddress?.Trim() ?? string.Empty,
-            FromDisplayName = string.IsNullOrWhiteSpace(request.FromDisplayName) ? "CherryBox" : request.FromDisplayName.Trim(),
-            PublicBaseUrl = request.PublicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty,
-            TokenLifetimeMinutes = request.TokenLifetimeMinutes
-        };
-
     private static PasswordResetSettingsDto ToDto(PasswordResetSettings settings) => new(
         settings.Enabled,
-        settings.SmtpHost,
-        settings.SmtpPort,
-        settings.UseTls,
-        settings.Username,
-        !string.IsNullOrEmpty(settings.Password),
-        settings.FromAddress,
-        settings.FromDisplayName,
         settings.PublicBaseUrl,
         settings.TokenLifetimeMinutes);
-
-    private static void ValidateSendSettings(PasswordResetSettings settings, bool requirePublicBaseUrl = true)
-    {
-        if (string.IsNullOrWhiteSpace(settings.SmtpHost))
-            throw new InvalidOperationException("SMTP host is required.");
-        if (settings.SmtpPort <= 0)
-            throw new InvalidOperationException("SMTP port must be positive.");
-        if (string.IsNullOrWhiteSpace(settings.FromAddress))
-            throw new InvalidOperationException("From address is required.");
-        if (requirePublicBaseUrl && string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
-            throw new InvalidOperationException("Public base URL is required.");
-    }
 }

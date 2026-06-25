@@ -49,6 +49,30 @@ jobs:
             exit 1
           fi
 
+      - name: Verify cherrybox plugin API compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          if [ ! -f _cherrybox/src/CherryBox.Core/Configuration/SiteAuthConfig.cs ]; then
+            echo "::error::cherrybox dev is missing unified site auth (SiteAuthConfig.cs)."
+            missing=1
+          fi
+          contracts=_cherrybox/src/CherryBox.Plugins.Abstractions/DownloadContracts.cs
+          if ! grep -q 'GetSupportedLoginSites' "$contracts"; then
+            echo "::error::cherrybox dev is missing updated download site-login contracts."
+            missing=1
+          fi
+          if grep -q 'ListSiteAuthAsync' "$contracts"; then
+            echo "::error::cherrybox dev still exposes legacy download site-auth CRUD APIs."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "Push cherrybox dev first, then re-run this workflow."
+            echo "Required cherrybox commit includes unified site logins (7424b44 or newer)."
+            exit 1
+          fi
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:

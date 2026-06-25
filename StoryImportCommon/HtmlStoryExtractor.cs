@@ -68,6 +68,11 @@ public static partial class HtmlStoryExtractor
     public static bool HostMatches(Uri url, params string[] hosts) =>
         hosts.Any(h => url.Host.Equals(h, StringComparison.OrdinalIgnoreCase) ||
                        url.Host.EndsWith("." + h, StringComparison.OrdinalIgnoreCase));
+
+    public static bool LooksLikeLoginWall(string html) =>
+        html.Contains("name=\"password\"", StringComparison.OrdinalIgnoreCase)
+        && html.Contains("Log In", StringComparison.OrdinalIgnoreCase)
+        && html.Contains("login.php", StringComparison.OrdinalIgnoreCase);
 }
 
 public abstract class HtmlStorySiteImporterBase : IStorySiteImporter
@@ -81,7 +86,7 @@ public abstract class HtmlStorySiteImporterBase : IStorySiteImporter
 
     public bool CanImport(Uri url) => MatchesHost(url);
 
-    public async Task<StoryImportPageResult> FetchPageAsync(StoryImportPageRequest request, CancellationToken cancellationToken = default)
+    public virtual async Task<StoryImportPageResult> FetchPageAsync(StoryImportPageRequest request, CancellationToken cancellationToken = default)
     {
         var html = await request.Http.GetStringAsync(request.Url, cancellationToken);
         var doc = new HtmlDocument();

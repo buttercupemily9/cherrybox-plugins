@@ -12,25 +12,42 @@
 </head>
 <body>
   <div class="card achievements-page">
-    <h1>Achievements</h1>
-    <p class="meta">Unlock badges by watching, pulsing, favoriting, and rating inside CherryBox.</p>
+    <header class="achievements-hero">
+      <div class="achievements-hero__copy">
+        <h1>Achievements</h1>
+        <p class="meta">Unlock badges by watching, pulsing, favoriting, and rating inside CherryBox.</p>
+      </div>
+      <div class="achievements-hero__stats">
+        <div class="achievements-ring" id="progress-ring" style="--progress: 0%">
+          <div class="achievements-ring__inner">
+            <span id="progress-percent">0%</span>
+          </div>
+        </div>
+        <div class="achievements-hero__counts">
+          <strong id="unlocked-count">0</strong>
+          <span><span id="total-count">0</span> total badges</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="achievements-overall" aria-hidden="true">
+      <div class="achievements-overall__label">
+        <span>Collection progress</span>
+        <span id="overall-progress-label">0 / 0</span>
+      </div>
+      <div class="achievements-overall__bar">
+        <div class="achievements-overall__fill" id="overall-progress-fill" style="width: 0%"></div>
+      </div>
+    </div>
 
     <div id="message" class="plugin-message" hidden></div>
 
-    <div class="achievements-summary">
-      <div class="achievements-summary__stat">
-        <strong id="unlocked-count">0</strong>
-        <span>Unlocked</span>
-      </div>
-      <div class="achievements-summary__stat">
-        <strong id="total-count">0</strong>
-        <span>Total</span>
-      </div>
+    <div class="achievements-toolbar">
+      <div class="achievement-filter" id="category-filter"></div>
       <button type="button" id="sync-btn" class="secondary">Refresh progress</button>
     </div>
 
-    <div class="achievement-filter" id="category-filter"></div>
-    <div id="achievements" class="achievement-grid"></div>
+    <div id="achievements"></div>
   </div>
 
   <script>
@@ -51,10 +68,34 @@
       var allAchievements = [];
       var activeCategory = 'All';
 
+      var categoryOrder = ['Watching', 'Stories', 'Engagement', 'Collection', 'Ratings'];
+
       function showMessage(text, isError) {
         messageEl.hidden = false;
         messageEl.textContent = text;
         messageEl.className = 'plugin-message' + (isError ? ' error' : '');
+      }
+
+      function formatShortDate(value) {
+        if (!value) return '';
+        return new Date(value).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+      }
+
+      function updateSummary(summary) {
+        var unlocked = summary.unlockedCount || 0;
+        var total = summary.totalCount || 0;
+        var percent = total > 0 ? Math.round((unlocked / total) * 100) : 0;
+
+        document.getElementById('unlocked-count').textContent = String(unlocked);
+        document.getElementById('total-count').textContent = String(total);
+        document.getElementById('progress-percent').textContent = percent + '%';
+        document.getElementById('progress-ring').style.setProperty('--progress', percent + '%');
+        document.getElementById('overall-progress-label').textContent = unlocked + ' / ' + total;
+        document.getElementById('overall-progress-fill').style.width = percent + '%';
       }
 
       function renderFilters(categories) {
@@ -78,6 +119,50 @@
         });
       }
 
+      function renderCard(item) {
+        var percent = item.target > 0 ? Math.min(100, Math.round((item.progress / item.target) * 100)) : 0;
+        return (
+          '<article class="achievement-card' + (item.unlocked ? ' unlocked' : ' locked') + '" data-category="' + escapeHtml(item.category) + '">' +
+            '<div class="achievement-card__icon" aria-hidden="true"></div>' +
+            '<div class="achievement-card__body">' +
+              '<div class="achievement-card__header">' +
+                '<h3 class="achievement-card__title">' + escapeHtml(item.title) + '</h3>' +
+                '<span class="achievement-card__badge">' + (item.unlocked ? 'Unlocked' : 'Locked') + '</span>' +
+              '</div>' +
+              '<p class="achievement-card__description">' + escapeHtml(item.description) + '</p>' +
+              '<div class="achievement-card__progress">' +
+                '<div class="achievement-card__progress-bar" role="progressbar" aria-valuenow="' + item.progress + '" aria-valuemin="0" aria-valuemax="' + item.target + '" aria-label="' + escapeHtml(item.title) + ' progress">' +
+                  '<div class="achievement-card__progress-fill" style="width:' + percent + '%"></div>' +
+                '</div>' +
+                '<div class="achievement-card__progress-footer">' +
+                  '<span class="achievement-card__progress-label">' + item.progress + ' / ' + item.target + '</span>' +
+                  '<span class="achievement-card__progress-percent">' + percent + '%</span>' +
+                '</div>' +
+              '</div>' +
+              (item.unlockedAt
+                ? '<p class="achievement-card__unlocked-at meta">Unlocked ' + escapeHtml(formatShortDate(item.unlockedAt)) + '</p>'
+                : '') +
+            '</div>' +
+          '</article>'
+        );
+      }
+
+      function groupCategories(items) {
+        var byCategory = {};
+        items.forEach(function (item) {
+          if (!byCategory[item.category]) byCategory[item.category] = [];
+          byCategory[item.category].push(item);
+        });
+
+        var ordered = categoryOrder.filter(function (category) { return byCategory[category]; });
+        Object.keys(byCategory).forEach(function (category) {
+          if (ordered.indexOf(category) < 0) ordered.push(category);
+        });
+        return ordered.map(function (category) {
+          return { category: category, items: byCategory[category] };
+        });
+      }
+
       function renderAchievements() {
         var el = document.getElementById('achievements');
         var items = activeCategory === 'All'
@@ -85,40 +170,34 @@
           : allAchievements.filter(function (item) { return item.category === activeCategory; });
 
         if (!items.length) {
-          el.innerHTML = '<p class="meta">No achievements in this category.</p>';
+          el.innerHTML = '<p class="achievements-empty meta">No achievements in this category yet.</p>';
           return;
         }
 
-        el.innerHTML = items.map(function (item) {
-          var percent = item.target > 0 ? Math.min(100, Math.round((item.progress / item.target) * 100)) : 0;
-          return (
-            '<article class="achievement-card' + (item.unlocked ? ' unlocked' : '') + '">' +
-              '<div class="achievement-card__header">' +
-                '<strong>' + escapeHtml(item.title) + '</strong>' +
-                '<span class="achievement-card__badge">' + (item.unlocked ? 'Unlocked' : 'Locked') + '</span>' +
-              '</div>' +
-              '<div class="achievement-card__category">' + escapeHtml(item.category) + '</div>' +
-              '<p class="meta">' + escapeHtml(item.description) + '</p>' +
-              '<div class="achievement-card__progress">' +
-                '<div class="achievement-card__progress-bar">' +
-                  '<div class="achievement-card__progress-fill" style="width:' + percent + '%"></div>' +
-                '</div>' +
-                '<div class="achievement-card__progress-label">' + item.progress + ' / ' + item.target + '</div>' +
-              '</div>' +
-              (item.unlockedAt
-                ? '<p class="achievement-card__unlocked-at meta">Unlocked ' + escapeHtml(formatTime(item.unlockedAt)) + '</p>'
-                : '') +
-            '</article>'
-          );
-        }).join('');
+        if (activeCategory === 'All') {
+          el.innerHTML = groupCategories(items).map(function (group) {
+            var unlocked = group.items.filter(function (item) { return item.unlocked; }).length;
+            return (
+              '<section class="achievement-section">' +
+                '<header class="achievement-section__header">' +
+                  '<h2 class="achievement-section__title" data-category="' + escapeHtml(group.category) + '">' + escapeHtml(group.category) + '</h2>' +
+                  '<span class="achievement-section__count meta">' + unlocked + ' / ' + group.items.length + ' unlocked</span>' +
+                '</header>' +
+                '<div class="achievement-grid">' + group.items.map(renderCard).join('') + '</div>' +
+              '</section>'
+            );
+          }).join('');
+          return;
+        }
+
+        el.innerHTML = '<div class="achievement-grid">' + items.map(renderCard).join('') + '</div>';
       }
 
       async function refresh() {
         var results = await Promise.all([api.listAchievements(), api.getAchievementSummary()]);
         allAchievements = results[0];
         var summary = results[1];
-        document.getElementById('unlocked-count').textContent = String(summary.unlockedCount);
-        document.getElementById('total-count').textContent = String(summary.totalCount);
+        updateSummary(summary);
         var categories = Array.from(new Set(allAchievements.map(function (item) { return item.category; }))).sort();
         renderFilters(categories);
         renderAchievements();

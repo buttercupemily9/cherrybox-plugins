@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 11,
+  "catalogVersion": 12,
   "plugins": [
     {
       "id": "backup",
@@ -38,16 +38,40 @@
       "changelog": "Built-in Pornhub GIF downloads to Pictures; Downloads library folder guidance in UI."
     },
     {
+      "id": "email",
+      "folder": "Email",
+      "name": "Email",
+      "version": "1.0.0",
+      "description": "Shared SMTP settings and email delivery for CherryBox plugins.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Email",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial release with SMTP settings, user emails, and send API."
+    },
+    {
       "id": "password-reset",
       "folder": "PasswordReset",
-      "name": "Email password reset",
-      "version": "1.0.0",
-      "description": "Send password reset links over SMTP when users forget their password.",
+      "name": "Password reset",
+      "version": "1.1.0",
+      "description": "Send password reset links when users forget their password. Requires the Email plugin.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/PasswordReset",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with SMTP settings and reset token emails."
+      "changelog": "Split SMTP into Email plugin; reset settings now cover tokens and public URL only."
+    },
+    {
+      "id": "newsletter",
+      "folder": "Newsletter",
+      "name": "Newsletter",
+      "version": "1.0.0",
+      "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial release with welcome and weekly newsletter emails."
     },
     {
       "id": "view-time",

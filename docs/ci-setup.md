@@ -21,6 +21,17 @@ On **buttercupemily9/cherrybox-plugins** → **Settings** → **Secrets and vari
 
 Re-run the failed workflow after saving the secret.
 
+## Push order for cross-repo changes
+
+Some plugin changes depend on new APIs in the main **cherrybox** repo (for example unified site logins in `CherryBox.Core` and updated contracts in `CherryBox.Plugins.Abstractions`).
+
+When a change spans both repositories:
+
+1. Push **cherrybox** `dev` first.
+2. Push **cherrybox-plugins** `dev` second (or re-run the plugins workflow).
+
+The CI workflow verifies that the checked-out cherrybox tree includes the APIs the plugins expect. If you see a compatibility error, update cherrybox `dev` and re-run the workflow.
+
 ## Local vs CI layout
 
 | Layout | Theme source |

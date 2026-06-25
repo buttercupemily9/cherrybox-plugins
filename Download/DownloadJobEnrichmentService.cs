@@ -340,7 +340,7 @@ public sealed class DownloadJobEnrichmentService
             args.Add(ffmpegDir);
         }
 
-        var siteAuth = YtDlpAuthHelper.MatchSiteAuth(url, _config.Current.Download.SiteAuth);
+        var siteAuth = YtDlpAuthHelper.MatchSiteAuth(url, _config.Current.SiteAuth);
         if (siteAuth is not null)
             YtDlpAuthHelper.AppendAuthArguments(args, siteAuth, _paths);
 

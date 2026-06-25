@@ -35,9 +35,9 @@ async function apiRequest(path, options = {}) {
 }
 
 const api = {
-  getSettings: () => apiRequest('/settings/password-reset'),
+  getSettings: () => apiRequest('/settings/newsletter'),
   updateSettings: (data) =>
-    apiRequest('/settings/password-reset', { method: 'PUT', body: JSON.stringify(data) }),
+    apiRequest('/settings/newsletter', { method: 'PUT', body: JSON.stringify(data) }),
   getServerSettings: () => apiRequest('/settings/server'),
 };
 
@@ -49,31 +49,32 @@ function showMessage(text, isError = false) {
 }
 
 function setFormBusy(busy) {
-  document.querySelectorAll('#settingsForm input, #settingsForm button').forEach((el) => {
+  document.querySelectorAll('#settingsForm input, #settingsForm select, #settingsForm button').forEach((el) => {
     el.disabled = busy;
   });
 }
 
 function fillForm(settings) {
-  document.getElementById('enabled').checked = Boolean(settings.enabled);
+  document.getElementById('welcomeEnabled').checked = settings.welcomeEnabled !== false;
+  document.getElementById('weeklyEnabled').checked = Boolean(settings.weeklyEnabled);
+  document.getElementById('weeklyDay').value = settings.weeklyDay || 'Sunday';
+  document.getElementById('weeklyTime').value = settings.weeklyTime || '09:00';
   document.getElementById('publicBaseUrl').value = settings.publicBaseUrl || '';
-  document.getElementById('tokenLifetimeMinutes').value = settings.tokenLifetimeMinutes || 60;
 }
 
 function readFormValues() {
   return {
-    enabled: document.getElementById('enabled').checked,
+    welcomeEnabled: document.getElementById('welcomeEnabled').checked,
+    weeklyEnabled: document.getElementById('weeklyEnabled').checked,
+    weeklyDay: document.getElementById('weeklyDay').value,
+    weeklyTime: document.getElementById('weeklyTime').value,
     publicBaseUrl: document.getElementById('publicBaseUrl').value.trim(),
-    tokenLifetimeMinutes: Number(document.getElementById('tokenLifetimeMinutes').value),
   };
 }
 
 function validateSettings(data) {
-  if (Number.isNaN(data.tokenLifetimeMinutes) || data.tokenLifetimeMinutes < 5 || data.tokenLifetimeMinutes > 1440)
-    return 'Reset link lifetime must be between 5 and 1440 minutes.';
-
-  if (!data.enabled) return null;
-  if (!data.publicBaseUrl) return 'Public base URL is required when password reset is enabled.';
+  if (!data.publicBaseUrl) return 'Public base URL is required.';
+  if (!/^\d{2}:\d{2}$/.test(data.weeklyTime)) return 'Weekly time must use HH:mm format.';
   return null;
 }
 
@@ -126,9 +127,9 @@ function bindSettingsForm() {
   });
 }
 
-function initPasswordResetSettingsUi() {
+function initNewsletterSettingsUi() {
   bindSettingsForm();
   void loadSettings();
 }
 
-window.PasswordResetPluginUi = { initPasswordResetSettingsUi };
+window.NewsletterPluginUi = { initNewsletterSettingsUi };

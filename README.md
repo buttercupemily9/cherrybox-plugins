@@ -27,7 +27,9 @@ cherrybox/
 | [Backup](Backup/) | `backup` | Backup plugin marker (core backup logic ships in CherryBox) |
 | [StorySites](StorySites/) | `story-sites` | Import stories from supported external sites |
 | [Download](Download/) | `download` | Video downloader (yt-dlp queue, scan, metadata) |
-| [PasswordReset](PasswordReset/) | `password-reset` | SMTP password reset emails |
+| [Email](Email/) | `email` | Shared SMTP and email delivery |
+| [PasswordReset](PasswordReset/) | `password-reset` | Password reset emails (requires Email) |
+| [Newsletter](Newsletter/) | `newsletter` | Welcome and weekly digest emails (requires Email) |
 | [ViewTime](ViewTime/) | `view-time` | Account view time limits, expiry, and minute requests |
 
 ## Build

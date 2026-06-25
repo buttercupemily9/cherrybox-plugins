@@ -1,0 +1,16 @@
+{
+  "id": "newsletter",
+  "name": "Newsletter",
+  "version": "1.0.0",
+  "entryAssembly": "Newsletter.Plugin.dll",
+  "entryType": "CherryBox.Newsletter.Plugin.NewsletterPlugin",
+  "settingsTabs": [
+    {
+      "id": "newsletter",
+      "label": "Newsletter",
+      "icon": "newspaper",
+      "page": "settings.html",
+      "order": 96
+    }
+  ]
+}
