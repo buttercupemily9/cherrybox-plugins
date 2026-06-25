@@ -11,5 +11,7 @@
   <Project Path="Achievements/Achievements.Plugin.csproj" />
   <Project Path="Social/Social.Plugin.csproj" />
   <Project Path="PasswordReset/PasswordReset.Plugin.csproj" />
+  <Project Path="Email/Email.Plugin.csproj" />
+  <Project Path="Newsletter/Newsletter.Plugin.csproj" />
   <Project Path="ViewTime/ViewTime.Plugin.csproj" />
 </Solution>
