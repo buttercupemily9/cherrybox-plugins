@@ -4,15 +4,14 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>PasswordReset.Plugin</AssemblyName>
-    <RootNamespace>CherryBox.PasswordReset.Plugin</RootNamespace>
+    <AssemblyName>Newsletter.Plugin</AssemblyName>
+    <RootNamespace>CherryBox.Newsletter.Plugin</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CherryBox.Plugins.Abstractions\CherryBox.Plugins.Abstractions.csproj">
       <Private>false</Private>
     </ProjectReference>
-    <ProjectReference Include="$(CherryBoxSrc)\CherryBox.Auth\CherryBox.Auth.csproj" />
     <ProjectReference Include="$(CherryBoxSrc)\CherryBox.Core\CherryBox.Core.csproj" />
     <ProjectReference Include="$(CherryBoxSrc)\CherryBox.Data\CherryBox.Data.csproj" />
   </ItemGroup>

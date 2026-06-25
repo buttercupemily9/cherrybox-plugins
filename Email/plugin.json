@@ -1,0 +1,16 @@
+{
+  "id": "email",
+  "name": "Email",
+  "version": "1.0.0",
+  "entryAssembly": "Email.Plugin.dll",
+  "entryType": "CherryBox.Email.Plugin.EmailPlugin",
+  "settingsTabs": [
+    {
+      "id": "smtp",
+      "label": "Email settings",
+      "icon": "mail",
+      "page": "settings.html",
+      "order": 94
+    }
+  ]
+}

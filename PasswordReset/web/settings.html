@@ -10,8 +10,6 @@
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
     .inline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.85rem; }
     .success { color: #2f7d32; margin-top: 0.75rem; }
-    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
-    .actions .form-row { flex: 1 1 220px; margin-bottom: 0; }
   </style>
   <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
   <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
@@ -19,51 +17,13 @@
 </head>
 <body>
   <div class="card">
-    <h3>Email password reset</h3>
-    <p class="meta">Configure SMTP so users can reset their password from the login page. Users need an email on their account (Account tab) or a username that looks like an email address.</p>
+    <h3>Password reset</h3>
+    <p class="meta">Let users reset their password from the login page. Configure SMTP under Settings → Email settings first. Users need an email on their account (Account tab) or a username that looks like an email address.</p>
 
     <form id="settingsForm" novalidate>
       <div class="inline">
         <input id="enabled" type="checkbox" />
         <label for="enabled">Enable password reset emails</label>
-      </div>
-
-      <div class="grid">
-        <div class="form-row">
-          <label for="smtpHost">SMTP host</label>
-          <input id="smtpHost" type="text" placeholder="smtp.example.com" />
-        </div>
-        <div class="form-row">
-          <label for="smtpPort">SMTP port</label>
-          <input id="smtpPort" type="number" min="1" value="587" />
-        </div>
-      </div>
-
-      <div class="inline">
-        <input id="useTls" type="checkbox" checked />
-        <label for="useTls">Use STARTTLS</label>
-      </div>
-
-      <div class="grid">
-        <div class="form-row">
-          <label for="username">SMTP username</label>
-          <input id="username" type="text" autocomplete="username" />
-        </div>
-        <div class="form-row">
-          <label for="password">SMTP password</label>
-          <input id="password" type="password" autocomplete="current-password" />
-        </div>
-      </div>
-
-      <div class="grid">
-        <div class="form-row">
-          <label for="fromAddress">From address</label>
-          <input id="fromAddress" type="email" placeholder="noreply@example.com" />
-        </div>
-        <div class="form-row">
-          <label for="fromDisplayName">From name</label>
-          <input id="fromDisplayName" type="text" value="CherryBox" />
-        </div>
       </div>
 
       <div class="grid">
@@ -78,14 +38,7 @@
         </div>
       </div>
 
-      <div class="actions">
-        <button type="submit">Save settings</button>
-        <button type="button" id="testEmailBtn" class="secondary">Send test email</button>
-        <div class="form-row">
-          <label for="testEmail">Test recipient</label>
-          <input id="testEmail" type="email" placeholder="you@example.com" />
-        </div>
-      </div>
+      <button type="submit">Save settings</button>
     </form>
 
     <div id="message"></div>

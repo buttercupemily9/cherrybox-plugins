@@ -314,84 +314,23 @@ public sealed class DownloadService : IDownloadService
     public Task<IReadOnlyList<DownloadHistoryEntry>> ListHistoryAsync(CancellationToken cancellationToken = default) =>
         _history.ListAsync(cancellationToken: cancellationToken);
 
-    public Task<IReadOnlyList<DownloadSiteAuthDto>> ListSiteAuthAsync(CancellationToken cancellationToken = default)
-    {
-        var entries = _config.Current.Download.SiteAuth
-            .OrderBy(e => e.SiteKey, StringComparer.OrdinalIgnoreCase)
-            .Select(ToSiteAuthDto)
+    public IReadOnlyList<DownloadSupportedLoginSiteDto> GetSupportedLoginSites() =>
+        DownloadSupportedSites.All
+            .Select(site => new DownloadSupportedLoginSiteDto(site.SiteKey, site.Label, site.TestUrl))
             .ToList();
-        return Task.FromResult<IReadOnlyList<DownloadSiteAuthDto>>(entries);
-    }
-
-    public async Task<DownloadSiteAuthDto> UpsertSiteAuthAsync(
-        UpsertDownloadSiteAuthRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var siteKey = YtDlpAuthHelper.NormalizeSiteKey(request.SiteKey);
-        if (string.IsNullOrWhiteSpace(siteKey))
-            throw new InvalidOperationException("Site name is required.");
-
-        var authMode = NormalizeAuthMode(request.AuthMode);
-        var existing = _config.Current.Download.SiteAuth
-            .FirstOrDefault(e => string.Equals(e.SiteKey, siteKey, StringComparison.OrdinalIgnoreCase));
-
-        if (existing is null)
-        {
-            existing = new DownloadSiteAuthConfig { SiteKey = siteKey };
-            _config.Current.Download.SiteAuth.Add(existing);
-        }
-
-        existing.AuthMode = authMode;
-        existing.Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim();
-        existing.TestUrl = string.IsNullOrWhiteSpace(request.TestUrl) ? null : request.TestUrl.Trim();
-
-        if (request.Password is not null)
-            existing.Password = string.IsNullOrWhiteSpace(request.Password) ? null : request.Password;
-
-        await _config.SaveAsync(cancellationToken);
-        return ToSiteAuthDto(existing);
-    }
-
-    public async Task RemoveSiteAuthAsync(string siteKey, CancellationToken cancellationToken = default)
-    {
-        var normalized = YtDlpAuthHelper.NormalizeSiteKey(siteKey);
-        if (string.IsNullOrWhiteSpace(normalized))
-            throw new InvalidOperationException("Site name is required.");
-
-        var removed = _config.Current.Download.SiteAuth
-            .FirstOrDefault(e => string.Equals(e.SiteKey, normalized, StringComparison.OrdinalIgnoreCase));
-        if (removed is null)
-            throw new InvalidOperationException($"Site login for \"{normalized}\" was not found.");
-
-        _config.Current.Download.SiteAuth.Remove(removed);
-        await _config.SaveAsync(cancellationToken);
-
-        var cookiesDir = Path.GetDirectoryName(YtDlpAuthHelper.GetCookiesFilePath(_paths, normalized));
-        if (!string.IsNullOrWhiteSpace(cookiesDir) && Directory.Exists(cookiesDir))
-        {
-            try
-            {
-                Directory.Delete(cookiesDir, recursive: true);
-            }
-            catch
-            {
-                // Best effort cleanup.
-            }
-        }
-    }
 
     public async Task<TestDownloadSiteAuthResult> TestSiteAuthAsync(
         TestDownloadSiteAuthRequest request,
         CancellationToken cancellationToken = default)
     {
-        var siteKey = YtDlpAuthHelper.NormalizeSiteKey(request.SiteKey);
+        var siteKey = SiteAuthHelper.NormalizeSiteKey(request.SiteKey);
         if (string.IsNullOrWhiteSpace(siteKey))
             throw new InvalidOperationException("Site name is required.");
 
-        var saved = _config.Current.Download.SiteAuth
+        var saved = _config.Current.SiteAuth
             .FirstOrDefault(e => string.Equals(e.SiteKey, siteKey, StringComparison.OrdinalIgnoreCase));
-        var authMode = NormalizeAuthMode(request.AuthMode ?? saved?.AuthMode ?? DownloadSiteAuthModes.Credentials);
-        var entry = new DownloadSiteAuthConfig
+        var authMode = NormalizeAuthMode(request.AuthMode ?? saved?.AuthMode ?? SiteAuthModes.Credentials);
+        var entry = new SiteAuthEntryConfig
         {
             SiteKey = siteKey,
             AuthMode = authMode,
@@ -402,7 +341,16 @@ public sealed class DownloadService : IDownloadService
 
         var testUrl = entry.TestUrl;
         if (string.IsNullOrWhiteSpace(testUrl))
+        {
+            testUrl = DownloadSupportedSites.All
+                .FirstOrDefault(site => site.SiteKey.Equals(siteKey, StringComparison.OrdinalIgnoreCase))
+                ?.TestUrl;
+        }
+
+        if (string.IsNullOrWhiteSpace(testUrl))
             throw new InvalidOperationException("A test URL is required. Enter a page that requires login on this site.");
+
+        entry.TestUrl = testUrl;
 
         try
         {
@@ -436,44 +384,6 @@ public sealed class DownloadService : IDownloadService
         }
     }
 
-    public async Task<DownloadSiteAuthDto> UploadSiteCookiesAsync(
-        string siteKey,
-        Stream cookiesFile,
-        CancellationToken cancellationToken = default)
-    {
-        var normalized = YtDlpAuthHelper.NormalizeSiteKey(siteKey);
-        if (string.IsNullOrWhiteSpace(normalized))
-            throw new InvalidOperationException("Site name is required.");
-
-        if (cookiesFile is null || !cookiesFile.CanRead)
-            throw new InvalidOperationException("Cookie file is required.");
-
-        var cookiesPath = YtDlpAuthHelper.GetCookiesFilePath(_paths, normalized);
-        Directory.CreateDirectory(Path.GetDirectoryName(cookiesPath)!);
-
-        await using var output = File.Create(cookiesPath);
-        await cookiesFile.CopyToAsync(output, cancellationToken);
-
-        var existing = _config.Current.Download.SiteAuth
-            .FirstOrDefault(e => string.Equals(e.SiteKey, normalized, StringComparison.OrdinalIgnoreCase));
-        if (existing is null)
-        {
-            existing = new DownloadSiteAuthConfig
-            {
-                SiteKey = normalized,
-                AuthMode = DownloadSiteAuthModes.Cookies
-            };
-            _config.Current.Download.SiteAuth.Add(existing);
-        }
-        else
-        {
-            existing.AuthMode = DownloadSiteAuthModes.Cookies;
-        }
-
-        await _config.SaveAsync(cancellationToken);
-        return ToSiteAuthDto(existing);
-    }
-
     private async Task<Guid> ResolveTargetFolderIdAsync(Guid? folderId, CancellationToken cancellationToken)
     {
         if (folderId.HasValue)
@@ -499,24 +409,12 @@ public sealed class DownloadService : IDownloadService
         return !DownloadUrlRules.IsImageOnlyHost(uri);
     }
 
-    private DownloadSiteAuthDto ToSiteAuthDto(DownloadSiteAuthConfig entry)
-    {
-        var cookiesPath = YtDlpAuthHelper.GetCookiesFilePath(_paths, entry.SiteKey);
-        return new DownloadSiteAuthDto(
-            entry.SiteKey,
-            entry.AuthMode,
-            entry.Username,
-            !string.IsNullOrWhiteSpace(entry.Password),
-            File.Exists(cookiesPath),
-            entry.TestUrl);
-    }
-
     private static string NormalizeAuthMode(string authMode)
     {
-        if (string.Equals(authMode, DownloadSiteAuthModes.Cookies, StringComparison.OrdinalIgnoreCase))
-            return DownloadSiteAuthModes.Cookies;
+        if (string.Equals(authMode, SiteAuthModes.Cookies, StringComparison.OrdinalIgnoreCase))
+            return SiteAuthModes.Cookies;
 
-        return DownloadSiteAuthModes.Credentials;
+        return SiteAuthModes.Credentials;
     }
 
     private string ResolveYtDlp()
@@ -1183,7 +1081,7 @@ public sealed class DownloadWorker
                 args.Add(ffmpegDir);
             }
 
-            var siteAuth = YtDlpAuthHelper.MatchSiteAuth(job.Url, _configManager.Current.Download.SiteAuth);
+            var siteAuth = YtDlpAuthHelper.MatchSiteAuth(job.Url, _configManager.Current.SiteAuth);
             if (siteAuth is not null)
                 YtDlpAuthHelper.AppendAuthArguments(args, siteAuth, _paths);
 

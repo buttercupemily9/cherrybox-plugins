@@ -27,13 +27,6 @@
       "icon": "queue",
       "page": "queue.html",
       "order": 90
-    },
-    {
-      "id": "site-auth",
-      "label": "Site logins",
-      "icon": "key",
-      "page": "auth.html",
-      "order": 91
     }
   ]
 }

@@ -82,10 +82,28 @@ public sealed class SexStories69Importer : HtmlStorySiteImporterBase
 
 public sealed class StoriesOnlineImporter : HtmlStorySiteImporterBase
 {
+    public bool SupportsSiteLogin => true;
     public override string SiteId => "storiesonline";
     public override string SiteName => "StoriesOnline";
     public override Uri SiteHome => new("https://storiesonline.net/");
     protected override bool MatchesHost(Uri url) => HtmlStoryExtractor.HostMatches(url, "storiesonline.net");
+
+    public override async Task<StoryImportPageResult> FetchPageAsync(
+        StoryImportPageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var html = await request.Http.GetStringAsync(request.Url, cancellationToken);
+        if (HtmlStoryExtractor.LooksLikeLoginWall(html))
+        {
+            throw new InvalidOperationException(
+                "This StoriesOnline story requires a member login. Add your StoriesOnline email and password under Settings → Site logins.");
+        }
+
+        var doc = new HtmlDocument();
+        doc.LoadHtml(html);
+        return ParsePage(doc, request.Url);
+    }
+
     protected override StoryImportPageResult ParsePage(HtmlDocument doc, Uri url)
     {
         var title = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText.Trim()

@@ -145,7 +145,7 @@ public sealed class ImageDownloadExecutor
             args.Add(ffmpegDir);
         }
 
-        var siteAuth = YtDlpAuthHelper.MatchSiteAuth(plan.SourceUrl, _config.Current.Download.SiteAuth);
+        var siteAuth = YtDlpAuthHelper.MatchSiteAuth(plan.SourceUrl, _config.Current.SiteAuth);
         if (siteAuth is not null)
             YtDlpAuthHelper.AppendAuthArguments(args, siteAuth, _paths);
 

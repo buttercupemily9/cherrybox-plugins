@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newsletter settings</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <style>
+    h3 { margin-top: 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+    .inline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.85rem; }
+    .success { color: #2f7d32; margin-top: 0.75rem; }
+  </style>
+  <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
+  <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
+  <script src="plugin-api.js" defer></script>
+</head>
+<body>
+  <div class="card">
+    <h3>Newsletter</h3>
+    <p class="meta">Send welcome emails when accounts are created and optional weekly digests of new CherryBox items. Emails are styled to match each user's skin (girl, boy, trans, pride, or other). Requires the Email plugin with SMTP configured.</p>
+
+    <form id="settingsForm" novalidate>
+      <div class="inline">
+        <input id="welcomeEnabled" type="checkbox" checked />
+        <label for="welcomeEnabled">Send welcome email on account creation</label>
+      </div>
+
+      <div class="inline">
+        <input id="weeklyEnabled" type="checkbox" />
+        <label for="weeklyEnabled">Send weekly digest of new items</label>
+      </div>
+
+      <div class="grid">
+        <div class="form-row">
+          <label for="weeklyDay">Weekly send day (UTC)</label>
+          <select id="weeklyDay">
+            <option>Sunday</option>
+            <option>Monday</option>
+            <option>Tuesday</option>
+            <option>Wednesday</option>
+            <option>Thursday</option>
+            <option>Friday</option>
+            <option>Saturday</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="weeklyTime">Weekly send time (UTC, HH:mm)</label>
+          <input id="weeklyTime" type="time" value="09:00" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="publicBaseUrl">Public base URL</label>
+        <input id="publicBaseUrl" type="text" placeholder="https://cherrybox.example.com" />
+      </div>
+
+      <button type="submit">Save settings</button>
+    </form>
+
+    <div id="message"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.CherryBoxPluginApi) {
+        CherryBoxPluginApi.initCherryBoxPlugin().catch(function (err) {
+          console.warn('CherryBox plugin theme init failed', err);
+        });
+      }
+      window.NewsletterPluginUi?.initNewsletterSettingsUi();
+    });
+  </script>
+</body>
+</html>
