@@ -87,23 +87,14 @@ internal static class PornhubGifDownloadHelper
         {
             var fileName = Path.GetFileName(new Uri(mediaUrl).AbsolutePath);
             if (!string.IsNullOrWhiteSpace(fileName))
-            {
-                if (fileName.EndsWith(".webm", StringComparison.OrdinalIgnoreCase) ||
-                    fileName.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
-                    return Path.ChangeExtension(fileName, ".gif");
-
-                if (!fileName.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
-                    return Path.ChangeExtension(fileName, ".gif");
-
                 return fileName;
-            }
         }
         catch
         {
             // fall through
         }
 
-        return $"gif-{gifId}.gif";
+        return $"gif-{gifId}.webm";
     }
 
     private static string? UnescapeJson(string value)

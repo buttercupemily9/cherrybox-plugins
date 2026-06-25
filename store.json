@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 10,
+  "catalogVersion": 11,
   "plugins": [
     {
       "id": "backup",
@@ -101,13 +101,25 @@
       "id": "transcoder",
       "folder": "Transcoder",
       "name": "Media transcoder",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Standardize video files in-place with configurable profiles, library assignments, and a 24/7 background transcode queue.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Transcoder",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
       "changelog": "Fix TranscodeApi load order on plugin settings pages."
+    },
+    {
+      "id": "story-tts",
+      "folder": "StoryTts",
+      "name": "Story text-to-speech",
+      "version": "1.0.0",
+      "description": "Convert .love story files to audio using the Venice API, save to your audio library, and auto-link when complete.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryTts",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial release with Venice TTS, AI settings tab, and text-to-speech queue."
     }
   ]
 }

@@ -55,6 +55,14 @@
     function renderCover(job) {
       var cover = coverUrl(job);
       if (cover) {
+        if (job.coverIsVideo) {
+          return (
+            '<video class="download-row__cover" src="' +
+            escapeHtml(cover) +
+            '" autoplay loop muted playsinline preload="metadata" aria-hidden="true"></video>'
+          );
+        }
+
         return (
           '<img class="download-row__cover" src="' +
           escapeHtml(cover) +
@@ -75,7 +83,10 @@
       }
 
       if (needsEnrichment(job)) {
-        return '<h3 class="download-row__title download-row__title--pending">Fetching video info…</h3>';
+        var pendingLabel = job.siteName && job.siteName !== 'Unknown'
+          ? 'Preparing download…'
+          : 'Fetching download info…';
+        return '<h3 class="download-row__title download-row__title--pending">' + escapeHtml(pendingLabel) + '</h3>';
       }
 
       return '<h3 class="download-row__title download-row__title--muted">' + escapeHtml(shortUrl(job.url)) + '</h3>';

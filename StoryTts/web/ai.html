@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+</head>
+<body>
+  <div class="card">
+    <h1>AI — Venice text-to-speech</h1>
+    <p class="meta">Configure Venice API credentials and defaults for converting <code>.love</code> story files into audio in your library.</p>
+    <div id="message" class="plugin-message" hidden></div>
+    <form id="settings-form">
+      <div class="settings-section">
+        <div class="form-row">
+          <label for="apiKey">Venice API key</label>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="Leave blank to keep existing key" />
+          <p class="meta" id="apiKeyStatus"></p>
+        </div>
+        <div class="form-row inline">
+          <label><input type="checkbox" id="clearApiKey" /> Clear saved API key</label>
+        </div>
+        <div class="form-row">
+          <label for="model">TTS model</label>
+          <input id="model" type="text" placeholder="tts-kokoro" />
+        </div>
+        <div class="form-row">
+          <label for="voice">Voice</label>
+          <input id="voice" type="text" placeholder="af_sky" />
+        </div>
+        <div class="form-row">
+          <label for="responseFormat">Response format</label>
+          <select id="responseFormat">
+            <option value="mp3">mp3</option>
+            <option value="wav">wav</option>
+            <option value="opus">opus</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="speed">Speed (0.25–4)</label>
+          <input id="speed" type="number" min="0.25" max="4" step="0.05" />
+        </div>
+        <div class="form-row">
+          <label for="maxChars">Max characters per request</label>
+          <input id="maxChars" type="number" min="500" max="12000" step="100" />
+        </div>
+        <div class="form-row">
+          <label for="audioFolder">Audio output folder</label>
+          <select id="audioFolder"></select>
+          <p class="meta">Generated audio is saved here, scanned into the library, and linked to the story when complete.</p>
+        </div>
+        <div class="form-row inline">
+          <label><input type="checkbox" id="backgroundWorkerEnabled" /> Run background worker</label>
+        </div>
+        <div class="form-row inline">
+          <label><input type="checkbox" id="autoLinkOnComplete" /> Auto-link audio to story</label>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save settings</button>
+        <button type="button" id="test-btn" class="btn-secondary">Test connection</button>
+      </div>
+    </form>
+  </div>
+  <script src="cherrybox/cherrybox-plugin-shell.js"></script>
+  <script src="cherrybox/cherrybox-plugin-api.js"></script>
+  <script src="plugin-api.js"></script>
+  <script src="ai-page.js"></script>
+</body>
+</html>

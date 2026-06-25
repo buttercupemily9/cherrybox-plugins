@@ -14,7 +14,7 @@
 <body>
   <div class="card download-page">
     <h1>Downloads</h1>
-    <p class="meta">Queue URLs for yt-dlp and supported image sites. You only see downloads you queued on this account. Queued <strong>videos</strong> save to a <strong>Downloads</strong> library folder (Settings → Library → Library folders). Pornhub <code>/gif/…</code> URLs save as GIFs to <strong>Picture</strong> folders. Other single images and GIFs save to Pictures; multi-image sets save to Galleries.</p>
+    <p class="meta">Queue URLs for yt-dlp and supported image sites. You only see downloads you queued on this account. Queued <strong>videos</strong> save to a <strong>Downloads</strong> library folder (Settings → Library → Library folders). Pornhub <code>/gif/…</code> URLs save as WebM or GIF to <strong>Picture</strong> folders (shown in Gifs). Other single images and GIFs save to Pictures; multi-image sets save to Galleries.</p>
     <p class="meta plugin-message error" id="library-folder-hint" hidden></p>
     <p class="meta" id="limit-summary" hidden></p>
     <div id="message" class="plugin-message" hidden></div>
@@ -73,7 +73,7 @@
           }
           libraryHintEl.hidden = false;
           libraryHintEl.textContent =
-            'No Downloads library folder is configured. Add a folder with content kind Downloads under Settings → Library → Library folders (or use Create starter folders during setup). Queued videos need that folder.';
+            'No Download (videos) library folder is configured. In Settings → Library, add a folder with content kind Download (videos) and point it to where you want yt-dlp files saved (for example D:\\cheerydata\\Downloads). Do not use the CherryBox metadata folder.';
         } catch {
           libraryHintEl.hidden = true;
         }

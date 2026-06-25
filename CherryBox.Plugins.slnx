@@ -7,6 +7,7 @@
   <Project Path="Download/Download.Plugin.csproj" />
   <Project Path="ImageDownload/ImageDownload.Plugin.csproj" />
   <Project Path="Transcoder/Transcoder.Plugin.csproj" />
+  <Project Path="StoryTts/StoryTts.Plugin.csproj" />
   <Project Path="Achievements/Achievements.Plugin.csproj" />
   <Project Path="Social/Social.Plugin.csproj" />
   <Project Path="PasswordReset/PasswordReset.Plugin.csproj" />

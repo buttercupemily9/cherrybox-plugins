@@ -1,0 +1,11 @@
+{
+  "id": "story-tts",
+  "name": "Story text-to-speech",
+  "version": "1.0.0",
+  "entryAssembly": "StoryTts.Plugin.dll",
+  "entryType": "CherryBox.StoryTts.Plugin.StoryTtsPlugin",
+  "settingsTabs": [
+    { "id": "ai", "label": "AI", "icon": "plugin", "page": "ai.html", "order": 82 },
+    { "id": "text-to-speech", "label": "Text to speech", "icon": "audio", "page": "text-to-speech.html", "order": 83 }
+  ]
+}
