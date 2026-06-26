@@ -68,7 +68,7 @@ internal sealed class NewsletterService : INewsletterService
             WelcomeEnabled = request.WelcomeEnabled,
             WeeklyEnabled = request.WeeklyEnabled,
             WeeklyDay = NormalizeDay(request.WeeklyDay),
-            WeeklyTime = request.WeeklyTime.Trim(),
+            WeeklyTime = NormalizeWeeklyTime(request.WeeklyTime),
             PublicBaseUrl = current.PublicBaseUrl,
             LastWeeklySentAt = current.LastWeeklySentAt
         };
@@ -227,7 +227,7 @@ internal sealed class NewsletterService : INewsletterService
         settings.WelcomeEnabled,
         settings.WeeklyEnabled,
         settings.WeeklyDay,
-        settings.WeeklyTime,
+        NormalizeWeeklyTime(settings.WeeklyTime),
         ResolveBaseUrl(settings));
 
     private static bool TryParseWeeklyTime(string value, out TimeSpan time)
@@ -237,6 +237,14 @@ internal sealed class NewsletterService : INewsletterService
             return false;
 
         return TimeSpan.TryParse(value.Trim(), out time);
+    }
+
+    private static string NormalizeWeeklyTime(string value)
+    {
+        if (!TryParseWeeklyTime(value, out var time))
+            return "09:00";
+
+        return $"{time.Hours:D2}:{time.Minutes:D2}";
     }
 
     private static string NormalizeDay(string day)

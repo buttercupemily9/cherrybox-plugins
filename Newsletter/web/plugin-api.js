@@ -58,11 +58,30 @@ function setFormBusy(busy) {
   });
 }
 
+function readBoolSetting(settings, key, defaultValue = false) {
+  if (!settings) return defaultValue;
+  if (Object.prototype.hasOwnProperty.call(settings, key)) return Boolean(settings[key]);
+  const pascalKey = key.charAt(0).toUpperCase() + key.slice(1);
+  if (Object.prototype.hasOwnProperty.call(settings, pascalKey)) return Boolean(settings[pascalKey]);
+  return defaultValue;
+}
+
+function toTimeInputValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '09:00';
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '09:00';
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || hours > 23 || minutes > 59) return '09:00';
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 function fillForm(settings) {
-  document.getElementById('welcomeEnabled').checked = settings.welcomeEnabled !== false;
-  document.getElementById('weeklyEnabled').checked = Boolean(settings.weeklyEnabled);
-  document.getElementById('weeklyDay').value = settings.weeklyDay || 'Sunday';
-  document.getElementById('weeklyTime').value = settings.weeklyTime || '09:00';
+  document.getElementById('welcomeEnabled').checked = readBoolSetting(settings, 'welcomeEnabled', true);
+  document.getElementById('weeklyEnabled').checked = readBoolSetting(settings, 'weeklyEnabled', false);
+  document.getElementById('weeklyDay').value = settings.weeklyDay || settings.WeeklyDay || 'Sunday';
+  document.getElementById('weeklyTime').value = toTimeInputValue(settings.weeklyTime || settings.WeeklyTime);
 }
 
 function readFormValues() {
@@ -70,11 +89,12 @@ function readFormValues() {
     welcomeEnabled: document.getElementById('welcomeEnabled').checked,
     weeklyEnabled: document.getElementById('weeklyEnabled').checked,
     weeklyDay: document.getElementById('weeklyDay').value,
-    weeklyTime: document.getElementById('weeklyTime').value,
+    weeklyTime: toTimeInputValue(document.getElementById('weeklyTime').value),
   };
 }
 
 function validateSettings(data) {
+  if (!data.weeklyEnabled) return null;
   if (!/^\d{2}:\d{2}$/.test(data.weeklyTime)) return 'Weekly time must use HH:mm format.';
   return null;
 }
