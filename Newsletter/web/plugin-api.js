@@ -12,6 +12,18 @@ function getToken() {
   return localStorage.getItem('cherrybox_token');
 }
 
+function formatApiError(parsed, fallback) {
+  if (parsed?.error) return String(parsed.error);
+  if (parsed?.errors && typeof parsed.errors === 'object') {
+    const messages = Object.values(parsed.errors)
+      .flatMap((entry) => (Array.isArray(entry) ? entry : [entry]))
+      .filter(Boolean)
+      .map(String);
+    if (messages.length) return messages.join(' ');
+  }
+  return parsed?.detail ?? parsed?.title ?? fallback;
+}
+
 async function apiRequest(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   const token = getToken();
@@ -24,7 +36,7 @@ async function apiRequest(path, options = {}) {
     let message = text || response.statusText;
     try {
       const parsed = JSON.parse(text);
-      message = parsed.error ?? parsed.detail ?? parsed.title ?? message;
+      message = formatApiError(parsed, message);
     } catch {
       // keep raw text
     }
