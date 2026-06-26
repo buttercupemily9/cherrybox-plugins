@@ -48,6 +48,25 @@ textarea {
   margin-top: 0.5rem;
 }
 
+.plugin-message {
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.plugin-message.success {
+  background: #e6f4ea;
+  color: #1b5e20;
+  border: 1px solid #2f7d32;
+}
+
+.plugin-message.error {
+  background: #fdecea;
+  color: #7f1d1d;
+  border: 1px solid #c62828;
+}
+
 .form-row {
   display: grid;
   gap: 0.5rem;
