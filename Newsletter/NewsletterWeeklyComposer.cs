@@ -36,15 +36,18 @@ public static class NewsletterWeeklyComposer
         DateTimeOffset since,
         CancellationToken cancellationToken)
     {
-        // SQLite provider cannot translate OR across two DateTimeOffset columns; union two filters instead.
-        var recentIds = await db.MediaItems.AsNoTracking()
+        // SQLite cannot translate OR across two DateTimeOffset columns; query each side separately.
+        var updatedIds = await db.MediaItems.AsNoTracking()
             .Where(m => m.UpdatedAt >= since)
             .Select(m => m.Id)
-            .Union(
-                db.MediaItems.AsNoTracking()
-                    .Where(m => m.CreatedAt >= since)
-                    .Select(m => m.Id))
             .ToListAsync(cancellationToken);
+
+        var createdIds = await db.MediaItems.AsNoTracking()
+            .Where(m => m.CreatedAt >= since)
+            .Select(m => m.Id)
+            .ToListAsync(cancellationToken);
+
+        var recentIds = updatedIds.Union(createdIds).ToList();
 
         if (recentIds.Count == 0)
             return [];
