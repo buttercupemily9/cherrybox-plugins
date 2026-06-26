@@ -183,8 +183,6 @@ internal sealed class NewsletterService : INewsletterService
     public Task UpdateSubscriptionAsync(Guid userId, bool subscribed, CancellationToken cancellationToken = default) =>
         _subscriptionStore.SetSubscribedAsync(userId, subscribed, cancellationToken);
 
-    public bool ShouldSendWeeklyDigestNow(DateTimeOffset utcNow) => ShouldSendWeeklyNow(utcNow);
-
     internal bool ShouldSendWeeklyNow(DateTimeOffset utcNow)
     {
         var settings = _settingsStore.Get();

@@ -11,7 +11,7 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
 
     public string Id => "newsletter";
     public string Name => "Newsletter";
-    public string Version => "1.1.3";
+    public string Version => "1.1.4";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
