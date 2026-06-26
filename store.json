@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 13,
+  "catalogVersion": 14,
   "plugins": [
     {
       "id": "backup",
@@ -65,13 +65,13 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.1.5",
+      "version": "1.1.6",
       "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Restore ShouldSendWeeklyDigestNow shim so Newsletter loads on hosts that still expect the scheduler on INewsletterService."
+      "changelog": "Fix weekly digest query on SQLite by avoiding untranslatable OR on CreatedAt/UpdatedAt."
     },
     {
       "id": "view-time",
