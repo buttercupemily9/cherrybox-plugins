@@ -33,7 +33,6 @@ public interface INewsletterService
     Task SendWeeklyDigestAsync(CancellationToken cancellationToken = default);
     Task<NewsletterSubscriptionDto> GetSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
     Task UpdateSubscriptionAsync(Guid userId, bool subscribed, CancellationToken cancellationToken = default);
-    bool ShouldSendWeeklyDigestNow(DateTimeOffset utcNow);
 
     Task<NewsletterTestResultDto> SendTestDigestToAdminAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Use the host newsletter test API.");

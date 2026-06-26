@@ -1,3 +1,4 @@
+using System.Reflection;
 using CherryBox.Plugins.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,7 +29,7 @@ internal sealed class NewsletterWorker
                 {
                     _logger.LogDebug("Newsletter service is not available; skipping weekly check.");
                 }
-                else if (newsletter.ShouldSendWeeklyDigestNow(DateTimeOffset.UtcNow))
+                else if (ShouldSendWeeklyDigest(newsletter, DateTimeOffset.UtcNow))
                 {
                     _logger.LogInformation("Weekly newsletter schedule matched; sending digest.");
                     await newsletter.SendWeeklyDigestAsync(cancellationToken);
@@ -47,6 +48,28 @@ internal sealed class NewsletterWorker
             {
                 break;
             }
+        }
+    }
+
+    private static bool ShouldSendWeeklyDigest(INewsletterService newsletter, DateTimeOffset utcNow)
+    {
+        var type = newsletter.GetType();
+        var method = type.GetMethod(
+                "ShouldSendWeeklyDigestNow",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            ?? type.GetMethod(
+                "ShouldSendWeeklyNow",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (method is null || method.ReturnType != typeof(bool))
+            return false;
+
+        try
+        {
+            return method.Invoke(newsletter, [utcNow]) is true;
+        }
+        catch
+        {
+            return false;
         }
     }
 }
