@@ -10,6 +10,7 @@ public sealed class RedditStoryImporter : IStorySiteImporter
     public string SiteName => "Reddit";
     public Uri SiteHome => new("https://www.reddit.com/");
     public bool CanImport(Uri url) => HtmlStoryExtractor.HostMatches(url, "reddit.com");
+    public bool SupportsSiteLogin => false;
     public Task<StoryImportPageResult> FetchPageAsync(StoryImportPageRequest request, CancellationToken cancellationToken = default) =>
         RedditStoryImporterHelper.FetchAsync(request, cancellationToken);
 }
@@ -82,7 +83,7 @@ public sealed class SexStories69Importer : HtmlStorySiteImporterBase
 
 public sealed class StoriesOnlineImporter : HtmlStorySiteImporterBase
 {
-    public bool SupportsSiteLogin => true;
+    public override bool SupportsSiteLogin => true;
     public override string SiteId => "storiesonline";
     public override string SiteName => "StoriesOnline";
     public override Uri SiteHome => new("https://storiesonline.net/");

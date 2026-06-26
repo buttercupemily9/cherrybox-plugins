@@ -24,8 +24,15 @@ internal sealed class NewsletterWorker
                 await using var scope = _scopeFactory.CreateAsyncScope();
                 var registry = scope.ServiceProvider.GetRequiredService<IPluginServiceRegistry>();
                 var newsletter = registry.Resolve<INewsletterService>(scope.ServiceProvider);
-                if (newsletter is NewsletterService service && service.ShouldSendWeeklyNow(DateTimeOffset.UtcNow))
+                if (newsletter is null)
+                {
+                    _logger.LogDebug("Newsletter service is not available; skipping weekly check.");
+                }
+                else if (newsletter.ShouldSendWeeklyDigestNow(DateTimeOffset.UtcNow))
+                {
+                    _logger.LogInformation("Weekly newsletter schedule matched; sending digest.");
                     await newsletter.SendWeeklyDigestAsync(cancellationToken);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -34,7 +41,7 @@ internal sealed class NewsletterWorker
 
             try
             {
-                await Task.Delay(TimeSpan.FromMinutes(15), cancellationToken);
+                await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
             }
             catch (OperationCanceledException)
             {

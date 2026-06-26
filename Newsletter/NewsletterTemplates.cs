@@ -8,8 +8,6 @@ internal sealed record SkinTheme(
     string TextColor,
     string? HeaderGradient = null);
 
-internal sealed record DigestItem(string Title, string MediaType, string Url, DateTimeOffset UpdatedAt);
-
 internal static class NewsletterTemplates
 {
     public static SkinTheme GetTheme(string? skinId)
@@ -52,7 +50,7 @@ internal static class NewsletterTemplates
                     </td></tr>
                     <tr><td style="padding:32px;">
                       <p style="font-size:18px;margin:0 0 16px;">Hi {safeName},</p>
-                      <p style="line-height:1.6;margin:0 0 16px;">Your CherryBox account is ready. Sign in to browse your library, discover new favorites, and enjoy content styled just for you.</p>
+                      <p style="line-height:1.6;margin:0 0 16px;">Your CherryBox account is ready — your private stash of filth, waiting whenever you're hard and need to cum. Sign in, pull up your favorites, and stroke to whatever makes you throb.</p>
                       <p style="margin:24px 0;">
                         <a href="{safeUrl}" style="display:inline-block;background:{theme.PrimaryColor};color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600;">Open CherryBox</a>
                       </p>
@@ -70,7 +68,8 @@ internal static class NewsletterTemplates
         string username,
         string baseUrl,
         SkinTheme theme,
-        IReadOnlyList<DigestItem> items)
+        IReadOnlyList<NewsletterDigestItem> items,
+        string? aiIntro = null)
     {
         var safeName = Escape(username);
         var safeUrl = Escape(baseUrl.TrimEnd('/'));
@@ -78,17 +77,14 @@ internal static class NewsletterTemplates
             ? $"background:{theme.PrimaryColor};"
             : $"background:{theme.HeaderGradient};";
 
+        var introHtml = BuildIntroHtml(username, aiIntro);
+        var listHeading = string.IsNullOrWhiteSpace(aiIntro)
+            ? "Fresh filth added this week — pick something and get off:"
+            : "Here's what I want you to stroke to:";
+
         var itemRows = items.Count == 0
-            ? "<p style=\"margin:0;line-height:1.6;\">No new items were added this week, but your library is always growing. Check back soon!</p>"
-            : string.Join("", items.Select(item =>
-                $"""
-                <tr>
-                  <td style="padding:12px 0;border-bottom:1px solid {theme.SecondaryColor};">
-                    <a href="{Escape(item.Url)}" style="color:{theme.PrimaryColor};font-weight:600;text-decoration:none;">{Escape(item.Title)}</a>
-                    <div style="font-size:13px;color:#64748b;margin-top:4px;">{Escape(item.MediaType)} · {item.UpdatedAt:MMM d, yyyy}</div>
-                  </td>
-                </tr>
-                """));
+            ? "<p style=\"margin:0;line-height:1.6;\">Nothing new dropped this week, but your library is still packed with stuff to cum to. Open CherryBox and find what makes you leak.</p>"
+            : string.Join("", items.Select(RenderItemRow));
 
         return $"""
             <!DOCTYPE html>
@@ -103,7 +99,8 @@ internal static class NewsletterTemplates
                       <p style="margin:8px 0 0;opacity:0.95;">Fresh picks for {safeName}</p>
                     </td></tr>
                     <tr><td style="padding:32px;">
-                      <p style="line-height:1.6;margin:0 0 20px;">Here are new and updated items from the past week:</p>
+                      {introHtml}
+                      <p style="line-height:1.6;margin:0 0 20px;">{Escape(listHeading)}</p>
                       <table role="presentation" width="100%" cellspacing="0" cellpadding="0">{itemRows}</table>
                       <p style="margin:28px 0 0;">
                         <a href="{safeUrl}" style="display:inline-block;background:{theme.PrimaryColor};color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600;">Browse CherryBox</a>
@@ -115,34 +112,97 @@ internal static class NewsletterTemplates
             </body>
             </html>
             """;
+
+        string RenderItemRow(NewsletterDigestItem item)
+        {
+            var metaParts = new List<string> { item.MediaType, item.UpdatedAt.ToString("MMM d, yyyy") };
+            if (!string.IsNullOrWhiteSpace(item.Performers))
+                metaParts.Add(item.Performers);
+            if (!string.IsNullOrWhiteSpace(item.Studio))
+                metaParts.Add(item.Studio);
+            if (!string.IsNullOrWhiteSpace(item.Tags))
+                metaParts.Add(item.Tags);
+
+            return $"""
+                <tr>
+                  <td style="padding:12px 0;border-bottom:1px solid {theme.SecondaryColor};">
+                    <a href="{Escape(item.Url)}" style="color:{theme.PrimaryColor};font-weight:600;text-decoration:none;">{Escape(item.Title)}</a>
+                    <div style="font-size:13px;color:#64748b;margin-top:4px;">{Escape(string.Join(" · ", metaParts))}</div>
+                  </td>
+                </tr>
+                """;
+        }
     }
 
     public static string WelcomePlainText(string username, string baseUrl) =>
         $"""
         Hi {username},
 
-        Welcome to CherryBox! Your account is ready.
+        Welcome to CherryBox! Your account is ready — your private porn stash is waiting.
 
-        Open CherryBox: {baseUrl.TrimEnd('/')}
+        Open CherryBox and stroke to whatever gets you hardest: {baseUrl.TrimEnd('/')}
 
         You can update your email or newsletter preferences from Account settings.
         """;
 
-    public static string WeeklyPlainText(string username, string baseUrl, IReadOnlyList<DigestItem> items)
+    public static string WeeklyPlainText(
+        string username,
+        string baseUrl,
+        IReadOnlyList<NewsletterDigestItem> items,
+        string? aiIntro = null)
     {
+        var intro = BuildIntroPlain(username, aiIntro);
         var lines = items.Count == 0
-            ? ["No new items were added this week."]
-            : items.Select(i => $"- {i.Title} ({i.MediaType}) {i.Url}").ToArray();
+            ? ["Nothing new this week — open CherryBox anyway and find something to cum to."]
+            : items.Select(FormatItemPlain).ToArray();
 
         return $"""
-            Hi {username},
-
-            Here is your CherryBox weekly update:
+            {intro}
 
             {string.Join(Environment.NewLine, lines)}
 
             Browse CherryBox: {baseUrl.TrimEnd('/')}
             """;
+    }
+
+    private static string BuildIntroHtml(string username, string? aiIntro)
+    {
+        if (string.IsNullOrWhiteSpace(aiIntro))
+        {
+            return $"""
+                <p style="font-size:18px;margin:0 0 16px;">Hi {Escape(username)},</p>
+                """;
+        }
+
+        var personalized = PersonalizeIntro(aiIntro, username);
+        var paragraphs = personalized
+            .Split(["\r\n\r\n", "\n\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(p => $"""<p style="line-height:1.7;margin:0 0 16px;">{Escape(p)}</p>""");
+
+        return string.Join("", paragraphs);
+    }
+
+    private static string BuildIntroPlain(string username, string? aiIntro)
+    {
+        if (string.IsNullOrWhiteSpace(aiIntro))
+            return $"Hi {username},\n\nYour weekly dose of filth from CherryBox:";
+
+        return PersonalizeIntro(aiIntro, username);
+    }
+
+    private static string PersonalizeIntro(string aiIntro, string username) =>
+        aiIntro.Replace("[NAME]", username, StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatItemPlain(NewsletterDigestItem item)
+    {
+        var details = new List<string> { item.MediaType };
+        if (!string.IsNullOrWhiteSpace(item.Performers))
+            details.Add(item.Performers);
+        if (!string.IsNullOrWhiteSpace(item.Studio))
+            details.Add(item.Studio);
+        if (!string.IsNullOrWhiteSpace(item.Tags))
+            details.Add(item.Tags);
+        return $"- {item.Title} ({string.Join(", ", details)}) {item.Url}";
     }
 
     private static string NormalizeSkinId(string? skinId)

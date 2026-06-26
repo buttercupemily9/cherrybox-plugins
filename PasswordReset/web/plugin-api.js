@@ -56,14 +56,12 @@ function setFormBusy(busy) {
 
 function fillForm(settings) {
   document.getElementById('enabled').checked = Boolean(settings.enabled);
-  document.getElementById('publicBaseUrl').value = settings.publicBaseUrl || '';
   document.getElementById('tokenLifetimeMinutes').value = settings.tokenLifetimeMinutes || 60;
 }
 
 function readFormValues() {
   return {
     enabled: document.getElementById('enabled').checked,
-    publicBaseUrl: document.getElementById('publicBaseUrl').value.trim(),
     tokenLifetimeMinutes: Number(document.getElementById('tokenLifetimeMinutes').value),
   };
 }
@@ -72,8 +70,6 @@ function validateSettings(data) {
   if (Number.isNaN(data.tokenLifetimeMinutes) || data.tokenLifetimeMinutes < 5 || data.tokenLifetimeMinutes > 1440)
     return 'Reset link lifetime must be between 5 and 1440 minutes.';
 
-  if (!data.enabled) return null;
-  if (!data.publicBaseUrl) return 'Public base URL is required when password reset is enabled.';
   return null;
 }
 
@@ -82,15 +78,17 @@ async function loadSettings() {
   showMessage('');
   try {
     const settings = await api.getSettings();
-    if (!settings.publicBaseUrl) {
+    fillForm(settings);
+    if (settings.enabled) {
       try {
         const server = await api.getServerSettings();
-        if (server?.publicUrl) settings.publicBaseUrl = server.publicUrl;
+        if (!server?.publicUrl) {
+          showMessage('Password reset is enabled but no public URL is set. Configure one under Settings → General.', true);
+        }
       } catch {
         // optional hint only
       }
     }
-    fillForm(settings);
   } catch (err) {
     showMessage(err instanceof Error ? err.message : 'Failed to load settings', true);
   } finally {
@@ -113,9 +111,26 @@ function bindSettingsForm() {
       return;
     }
 
+    if (data.enabled) {
+      try {
+        const server = await api.getServerSettings();
+        if (!server?.publicUrl) {
+          showMessage('Set a public URL under Settings → General before enabling password reset.', true);
+          return;
+        }
+      } catch {
+        showMessage('Could not verify the public URL. Check Settings → General.', true);
+        return;
+      }
+    }
+
     setFormBusy(true);
     try {
-      const updated = await api.updateSettings(data);
+      const updated = await api.updateSettings({
+        enabled: data.enabled,
+        publicBaseUrl: '',
+        tokenLifetimeMinutes: data.tokenLifetimeMinutes,
+      });
       fillForm(updated);
       showMessage('Settings saved');
     } catch (err) {

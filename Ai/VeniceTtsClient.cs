@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
-namespace CherryBox.StoryTts.Plugin;
+namespace CherryBox.Ai.Plugin;
 
 internal sealed class VeniceTtsClient
 {
@@ -14,7 +14,7 @@ internal sealed class VeniceTtsClient
     public async Task<byte[]> SynthesizeAsync(
         string apiKey,
         string text,
-        StoryTtsSettings settings,
+        AiSettings settings,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(apiKey))

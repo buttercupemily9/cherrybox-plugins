@@ -34,7 +34,6 @@ var StoryTtsApi = {
   workerStatus: () => storyTtsRequest('/worker'),
   startWorker: () => storyTtsRequest('/worker/start', { method: 'POST' }),
   stopWorker: () => storyTtsRequest('/worker/stop', { method: 'POST' }),
-  testConnection: (body) => storyTtsRequest('/test', { method: 'POST', body: JSON.stringify(body || {}) }),
   listStories: () => coreRequest('/api/v1/stories'),
   listLibraryFolders: () => coreRequest('/api/v1/library/folders'),
 };

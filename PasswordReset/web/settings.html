@@ -18,7 +18,7 @@
 <body>
   <div class="card">
     <h3>Password reset</h3>
-    <p class="meta">Let users reset their password from the login page. Configure SMTP under Settings → Email settings first. Users need an email on their account (Account tab) or a username that looks like an email address.</p>
+    <p class="meta">Let users reset their password from the login page. Configure SMTP under Settings → Email settings first. Set the public URL under Settings → General. Users need an email on their account (Account tab) or a username that looks like an email address.</p>
 
     <form id="settingsForm" novalidate>
       <div class="inline">
@@ -27,11 +27,6 @@
       </div>
 
       <div class="grid">
-        <div class="form-row">
-          <label for="publicBaseUrl">Public base URL</label>
-          <input id="publicBaseUrl" type="text" placeholder="https://cherrybox.example.com" />
-          <p class="meta">Also configurable under Settings → Dashboard → Server.</p>
-        </div>
         <div class="form-row">
           <label for="tokenLifetimeMinutes">Reset link lifetime (minutes)</label>
           <input id="tokenLifetimeMinutes" type="number" min="5" max="1440" value="60" />

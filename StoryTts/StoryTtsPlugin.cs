@@ -11,7 +11,7 @@ public sealed class StoryTtsPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "story-tts";
     public string Name => "Story text-to-speech";
-    public string Version => "1.0.0";
+    public string Version => "1.1.0";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -25,18 +25,17 @@ public sealed class StoryTtsPlugin : ICherryBoxPlugin, IPluginServiceContributor
         var workerState = new StoryTtsWorkerState();
         workerState.SetEnabled(settingsStore.Get().BackgroundWorkerEnabled);
 
-        var venice = new VeniceTtsClient(new HttpClient { Timeout = TimeSpan.FromMinutes(10) });
+        var plugins = services.GetRequiredService<IPluginServiceRegistry>();
         var executor = new StoryTtsExecutor(
             services.GetRequiredService<IServiceScopeFactory>(),
             settingsStore,
-            venice,
+            plugins,
             services.GetRequiredService<ILogger<StoryTtsExecutor>>());
         var storyTtsService = new StoryTtsService(
             services.GetRequiredService<IServiceScopeFactory>(),
             settingsStore,
             jobStore,
             workerState,
-            venice,
             services.GetRequiredService<ILogger<StoryTtsService>>());
         var worker = new StoryTtsWorker(
             jobStore,
@@ -48,7 +47,6 @@ public sealed class StoryTtsPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterSingleton(settingsStore);
         registry.RegisterSingleton(jobStore);
         registry.RegisterSingleton(workerState);
-        registry.RegisterSingleton(venice);
         registry.RegisterSingleton(executor);
         registry.RegisterSingleton(storyTtsService);
         registry.RegisterSingleton(worker);

@@ -1,4 +1,5 @@
 using CherryBox.Auth;
+using CherryBox.Core.Configuration;
 using CherryBox.Core.Entities;
 using CherryBox.Data;
 using CherryBox.Plugins.Abstractions;
@@ -11,6 +12,7 @@ internal sealed class PasswordResetService : IPasswordResetService
 {
     private readonly CherryBoxDbContext _db;
     private readonly IAuthService _auth;
+    private readonly IConfigManager _config;
     private readonly PasswordResetSettingsStore _settingsStore;
     private readonly ResetTokenStore _tokenStore;
     private readonly IEmailService _emailService;
@@ -19,6 +21,7 @@ internal sealed class PasswordResetService : IPasswordResetService
     public PasswordResetService(
         CherryBoxDbContext db,
         IAuthService auth,
+        IConfigManager config,
         PasswordResetSettingsStore settingsStore,
         ResetTokenStore tokenStore,
         IEmailService emailService,
@@ -26,6 +29,7 @@ internal sealed class PasswordResetService : IPasswordResetService
     {
         _db = db;
         _auth = auth;
+        _config = config;
         _settingsStore = settingsStore;
         _tokenStore = tokenStore;
         _emailService = emailService;
@@ -36,9 +40,11 @@ internal sealed class PasswordResetService : IPasswordResetService
     {
         var settings = _settingsStore.Get();
         var emailConfigured = _emailService.GetStatus().Configured;
+        var publicUrl = ResolvePublicBaseUrl(settings);
         var configured = settings.Enabled
             && emailConfigured
-            && !string.IsNullOrWhiteSpace(settings.PublicBaseUrl);
+            && !string.IsNullOrWhiteSpace(CherryBoxUrlSettings.NormalizePublicUrl(_config.Current.PublicUrl)
+                ?? CherryBoxUrlSettings.NormalizePublicUrl(settings.PublicBaseUrl));
         return new PasswordResetStatusDto(true, configured);
     }
 
@@ -61,7 +67,7 @@ internal sealed class PasswordResetService : IPasswordResetService
         var next = new PasswordResetSettings
         {
             Enabled = request.Enabled,
-            PublicBaseUrl = request.PublicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty,
+            PublicBaseUrl = _settingsStore.Get().PublicBaseUrl,
             TokenLifetimeMinutes = request.TokenLifetimeMinutes
         };
 
@@ -75,9 +81,11 @@ internal sealed class PasswordResetService : IPasswordResetService
         if (!settings.Enabled || !_emailService.GetStatus().Configured)
             return;
 
-        if (string.IsNullOrWhiteSpace(settings.PublicBaseUrl))
+        var publicBaseUrl = ResolvePublicBaseUrl(settings);
+        if (string.IsNullOrWhiteSpace(CherryBoxUrlSettings.NormalizePublicUrl(_config.Current.PublicUrl)
+                ?? CherryBoxUrlSettings.NormalizePublicUrl(settings.PublicBaseUrl)))
         {
-            _logger.LogWarning("Password reset requested but public base URL is not configured.");
+            _logger.LogWarning("Password reset requested but public URL is not configured in Settings → General.");
             return;
         }
 
@@ -103,7 +111,7 @@ internal sealed class PasswordResetService : IPasswordResetService
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(settings.TokenLifetimeMinutes);
         await _tokenStore.StoreAsync(tokenHash, user.Id, expiresAt, cancellationToken);
 
-        var resetUrl = $"{settings.PublicBaseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
+        var resetUrl = $"{publicBaseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
         var body =
             $"""
             Hello {user.Username},
@@ -155,8 +163,11 @@ internal sealed class PasswordResetService : IPasswordResetService
         return username.Contains('@', StringComparison.Ordinal) ? username.Trim() : null;
     }
 
-    private static PasswordResetSettingsDto ToDto(PasswordResetSettings settings) => new(
+    private string ResolvePublicBaseUrl(PasswordResetSettings settings) =>
+        CherryBoxUrlSettings.ResolvePublicBaseUrl(_config.Current, settings.PublicBaseUrl, _config.Current.Port);
+
+    private PasswordResetSettingsDto ToDto(PasswordResetSettings settings) => new(
         settings.Enabled,
-        settings.PublicBaseUrl,
+        ResolvePublicBaseUrl(settings),
         settings.TokenLifetimeMinutes);
 }

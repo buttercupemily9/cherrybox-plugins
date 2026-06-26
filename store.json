@@ -65,13 +65,13 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.0.0",
+      "version": "1.1.3",
       "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with welcome and weekly newsletter emails."
+      "changelog": "Newsletter copy and AI prompts use explicit X-rated tone instead of PG-13."
     },
     {
       "id": "view-time",
@@ -134,16 +134,28 @@
       "changelog": "Fix TranscodeApi load order on plugin settings pages."
     },
     {
+      "id": "ai",
+      "folder": "Ai",
+      "name": "AI",
+      "version": "1.1.0",
+      "description": "Shared Venice API credentials, chat model, and text-to-speech defaults for CherryBox plugins.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Ai",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Add Venice chat model for AI-written newsletter intros and other plugins."
+    },
+    {
       "id": "story-tts",
       "folder": "StoryTts",
       "name": "Story text-to-speech",
-      "version": "1.0.0",
-      "description": "Convert .love story files to audio using the Venice API, save to your audio library, and auto-link when complete.",
+      "version": "1.1.0",
+      "description": "Convert .love story files to audio using the AI plugin, save to your audio library, and auto-link when complete.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryTts",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with Venice TTS, AI settings tab, and text-to-speech queue."
+      "changelog": "Split Venice AI settings into the AI plugin; this plugin now handles the TTS queue only."
     }
   ]
 }

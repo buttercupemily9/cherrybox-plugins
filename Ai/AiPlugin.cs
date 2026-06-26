@@ -1,0 +1,42 @@
+using CherryBox.Plugins.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace CherryBox.Ai.Plugin;
+
+public sealed class AiPlugin : ICherryBoxPlugin, IPluginServiceContributor
+{
+    private AiSettingsStore? _settingsStore;
+
+    public string Id => "ai";
+    public string Name => "AI";
+    public string Version => "1.0.0";
+
+    public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
+    {
+        _settingsStore = new AiSettingsStore(context.DataDirectory);
+        var venice = new VeniceTtsClient(new HttpClient { Timeout = TimeSpan.FromMinutes(10) });
+        var chat = new VeniceChatClient(new HttpClient { Timeout = TimeSpan.FromMinutes(2) });
+        var aiService = new AiService(_settingsStore, venice, chat);
+
+        registry.RegisterSingleton(_settingsStore);
+        registry.RegisterSingleton(venice);
+        registry.RegisterSingleton(chat);
+        registry.RegisterSingleton(aiService);
+        registry.RegisterScoped<IAiService>(sp =>
+            sp.GetRequiredService<IPluginServiceRegistry>().Resolve<AiService>(sp)!);
+    }
+
+    public Task StartAsync(IPluginContext context, CancellationToken cancellationToken = default)
+    {
+        if (_settingsStore is not null)
+            LegacyStoryTtsAiMigration.TryImportFromStoryTts(context.DataDirectory, _settingsStore);
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+}

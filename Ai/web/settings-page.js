@@ -1,5 +1,5 @@
 (function () {
-  var api = window.StoryTtsApi;
+  var api = window.AiApi;
   var messageEl = document.getElementById('message');
 
   function showMessage(text, kind) {
@@ -8,31 +8,17 @@
     messageEl.className = 'plugin-message ' + (kind || '');
   }
 
-  function audioFolderOptions(folders, selectedId) {
-    return ['<option value="">Select audio folder…</option>']
-      .concat(folders
-        .filter(function (f) { return f.contentKind === 'Audio' || f.contentKind === 'Mix'; })
-        .map(function (f) {
-          var selected = selectedId && f.id === selectedId ? ' selected' : '';
-          return '<option value="' + f.id + '"' + selected + '>' + f.path + ' (' + f.contentKind + ')</option>';
-        }))
-      .join('');
-  }
-
   async function load() {
     var settings = await api.getSettings();
-    var folders = await api.listLibraryFolders();
     document.getElementById('apiKeyStatus').textContent = settings.hasApiKey
       ? 'A Venice API key is saved.'
       : 'No API key saved yet.';
     document.getElementById('model').value = settings.model || 'tts-kokoro';
+    document.getElementById('chatModel').value = settings.chatModel || 'venice-uncensored';
     document.getElementById('voice').value = settings.voice || 'af_sky';
     document.getElementById('responseFormat').value = settings.responseFormat || 'mp3';
     document.getElementById('speed').value = settings.speed || 1;
     document.getElementById('maxChars').value = settings.maxCharsPerRequest || 4000;
-    document.getElementById('backgroundWorkerEnabled').checked = !!settings.backgroundWorkerEnabled;
-    document.getElementById('autoLinkOnComplete').checked = settings.autoLinkOnComplete !== false;
-    document.getElementById('audioFolder').innerHTML = audioFolderOptions(folders, settings.audioLibraryFolderId);
   }
 
   document.getElementById('settings-form').onsubmit = async function (e) {
@@ -42,13 +28,11 @@
         apiKey: document.getElementById('apiKey').value || null,
         clearApiKey: document.getElementById('clearApiKey').checked,
         model: document.getElementById('model').value,
+        chatModel: document.getElementById('chatModel').value,
         voice: document.getElementById('voice').value,
         responseFormat: document.getElementById('responseFormat').value,
         speed: Number(document.getElementById('speed').value),
-        maxCharsPerRequest: Number(document.getElementById('maxChars').value),
-        audioLibraryFolderId: document.getElementById('audioFolder').value || null,
-        backgroundWorkerEnabled: document.getElementById('backgroundWorkerEnabled').checked,
-        autoLinkOnComplete: document.getElementById('autoLinkOnComplete').checked
+        maxCharsPerRequest: Number(document.getElementById('maxChars').value)
       });
       document.getElementById('apiKey').value = '';
       document.getElementById('clearApiKey').checked = false;

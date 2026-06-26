@@ -13,30 +13,45 @@ internal sealed class StoryTtsExecutor
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly StoryTtsSettingsStore _settings;
-    private readonly VeniceTtsClient _venice;
+    private readonly IPluginServiceRegistry _plugins;
     private readonly ILogger<StoryTtsExecutor> _logger;
 
     public StoryTtsExecutor(
         IServiceScopeFactory scopeFactory,
         StoryTtsSettingsStore settings,
-        VeniceTtsClient venice,
+        IPluginServiceRegistry plugins,
         ILogger<StoryTtsExecutor> logger)
     {
         _scopeFactory = scopeFactory;
         _settings = settings;
-        _venice = venice;
+        _plugins = plugins;
         _logger = logger;
     }
 
     public async Task<StoryTtsJobDto> ExecuteAsync(StoryTtsJobDto job, CancellationToken cancellationToken)
     {
-        var settings = _settings.Get();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-            return Fail(job, "Venice API key is not configured.");
-        if (settings.AudioLibraryFolderId is null)
-            return Fail(job, "Select an audio library folder in Settings → AI.");
-
         using var scope = _scopeFactory.CreateScope();
+        var ai = _plugins.Resolve<IAiService>(scope.ServiceProvider);
+        if (ai is null)
+            return Fail(job, "AI plugin is not loaded. Install and enable the AI plugin.");
+
+        AiSettingsDto aiSettings;
+        try
+        {
+            aiSettings = await ai.GetSettingsAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return Fail(job, ex.Message);
+        }
+
+        if (!aiSettings.HasApiKey)
+            return Fail(job, "Venice API key is not configured. Open Settings → AI.");
+
+        var settings = _settings.Get();
+        if (settings.AudioLibraryFolderId is null)
+            return Fail(job, "Select an audio library folder in Settings → Text to speech.");
+
         var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
         var folder = await db.LibraryFolders.AsNoTracking()
             .FirstOrDefaultAsync(f => f.Id == settings.AudioLibraryFolderId.Value, cancellationToken);
@@ -60,7 +75,7 @@ internal sealed class StoryTtsExecutor
             return Fail(job, ex.Message);
         }
 
-        var chunks = StoryTextExtractor.ChunkText(plainText, settings.MaxCharsPerRequest);
+        var chunks = StoryTextExtractor.ChunkText(plainText, aiSettings.MaxCharsPerRequest);
         job = job with
         {
             ChunksTotal = chunks.Count,
@@ -72,7 +87,16 @@ internal sealed class StoryTtsExecutor
         for (var i = 0; i < chunks.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var audio = await _venice.SynthesizeAsync(settings.ApiKey!, chunks[i], settings, cancellationToken);
+            byte[] audio;
+            try
+            {
+                audio = await ai.SynthesizeSpeechAsync(chunks[i], cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return Fail(job, ex.Message);
+            }
+
             audioParts.Add(audio);
             job = job with
             {
@@ -82,7 +106,7 @@ internal sealed class StoryTtsExecutor
         }
 
         Directory.CreateDirectory(folder.Path);
-        var extension = NormalizeExtension(settings.ResponseFormat);
+        var extension = NormalizeExtension(aiSettings.ResponseFormat);
         var outputFileName = BuildOutputFileName(story, extension);
         var outputPath = GetUniqueOutputPath(folder.Path, outputFileName);
         await File.WriteAllBytesAsync(outputPath, ConcatenateAudio(audioParts), cancellationToken);

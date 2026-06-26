@@ -22,6 +22,8 @@ public sealed record NewsletterSubscriptionDto(
 
 public sealed record UpdateNewsletterSubscriptionRequest(bool Subscribed);
 
+public sealed record NewsletterTestResultDto(bool Success, string Message, string? SentTo);
+
 public interface INewsletterService
 {
     NewsletterStatusDto GetStatus();
@@ -31,4 +33,8 @@ public interface INewsletterService
     Task SendWeeklyDigestAsync(CancellationToken cancellationToken = default);
     Task<NewsletterSubscriptionDto> GetSubscriptionAsync(Guid userId, CancellationToken cancellationToken = default);
     Task UpdateSubscriptionAsync(Guid userId, bool subscribed, CancellationToken cancellationToken = default);
+    bool ShouldSendWeeklyDigestNow(DateTimeOffset utcNow);
+
+    Task<NewsletterTestResultDto> SendTestDigestToAdminAsync(Guid adminUserId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Use the host newsletter test API.");
 }
