@@ -1,6 +1,3 @@
-.plugin-message { margin: 0.75rem 0; padding: 0.65rem 0.85rem; border-radius: 8px; }
-.plugin-message.error { background: rgba(220, 53, 69, 0.15); color: #ffb3b8; }
-.plugin-message.success { background: rgba(40, 167, 69, 0.15); color: #b8f0c6; }
 .settings-section { margin-top: 1.25rem; }
 .form-row { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem; }
 .form-row.inline { flex-direction: row; align-items: center; gap: 0.75rem; }
