@@ -10,8 +10,25 @@
 <body>
   <div class="card">
     <h1>Text to speech</h1>
-    <p class="meta">Queue <code>.love</code> stories for Venice TTS. Completed jobs write audio to your configured folder and link it to the story.</p>
+    <p class="meta">Queue <code>.love</code> stories for Venice TTS using the <strong>AI</strong> plugin. Completed jobs write audio to your configured folder and link it to the story.</p>
     <div id="message" class="plugin-message" hidden></div>
+    <form id="settings-form" class="settings-section">
+      <h2>Settings</h2>
+      <div class="form-row">
+        <label for="audioFolder">Audio output folder</label>
+        <select id="audioFolder"></select>
+        <p class="meta">Generated audio is saved here, scanned into the library, and linked to the story when complete.</p>
+      </div>
+      <div class="form-row inline">
+        <label><input type="checkbox" id="backgroundWorkerEnabled" /> Run background worker</label>
+      </div>
+      <div class="form-row inline">
+        <label><input type="checkbox" id="autoLinkOnComplete" /> Auto-link audio to story</label>
+      </div>
+      <div class="actions">
+        <button type="submit">Save settings</button>
+      </div>
+    </form>
     <div id="worker-status" class="meta"></div>
     <div class="actions">
       <button type="button" id="start-worker">Start worker</button>

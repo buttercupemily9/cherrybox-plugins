@@ -11,7 +11,7 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
 
     public string Id => "newsletter";
     public string Name => "Newsletter";
-    public string Version => "1.0.0";
+    public string Version => "1.1.3";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -29,9 +29,12 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
                 ?? throw new InvalidOperationException("Email plugin is required for the newsletter plugin.");
             return new NewsletterService(
                 sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
+                sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
                 settingsStore,
                 subscriptionStore,
                 email,
+                sp.GetRequiredService<IPluginServiceRegistry>(),
+                sp,
                 sp.GetRequiredService<ILogger<NewsletterService>>());
         });
     }
@@ -42,7 +45,7 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
         var logger = context.Services.GetRequiredService<ILogger<NewsletterWorker>>();
         var registry = context.Services.GetRequiredService<IPluginServiceRegistry>();
 
-        _workerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _workerCts = new CancellationTokenSource();
         var worker = new NewsletterWorker(scopeFactory, logger);
         _workerTask = worker.RunAsync(_workerCts.Token);
 

@@ -1,4 +1,4 @@
-using CherryBox.Core.Enums;
+using CherryBox.Core.Configuration;
 using CherryBox.Data;
 using CherryBox.Plugins.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -8,25 +8,32 @@ namespace CherryBox.Newsletter.Plugin;
 
 internal sealed class NewsletterService : INewsletterService
 {
-    private const int DigestItemLimit = 12;
-
     private readonly CherryBoxDbContext _db;
+    private readonly IConfigManager _config;
     private readonly NewsletterSettingsStore _settingsStore;
     private readonly NewsletterSubscriptionStore _subscriptionStore;
     private readonly IEmailService _emailService;
+    private readonly IPluginServiceRegistry _plugins;
+    private readonly IServiceProvider _services;
     private readonly ILogger<NewsletterService> _logger;
 
     public NewsletterService(
         CherryBoxDbContext db,
+        IConfigManager config,
         NewsletterSettingsStore settingsStore,
         NewsletterSubscriptionStore subscriptionStore,
         IEmailService emailService,
+        IPluginServiceRegistry plugins,
+        IServiceProvider services,
         ILogger<NewsletterService> logger)
     {
         _db = db;
+        _config = config;
         _settingsStore = settingsStore;
         _subscriptionStore = subscriptionStore;
         _emailService = emailService;
+        _plugins = plugins;
+        _services = services;
         _logger = logger;
     }
 
@@ -35,7 +42,6 @@ internal sealed class NewsletterService : INewsletterService
         var settings = _settingsStore.Get();
         var emailConfigured = _emailService.GetStatus().Configured;
         var configured = emailConfigured
-            && !string.IsNullOrWhiteSpace(settings.PublicBaseUrl)
             && (settings.WelcomeEnabled || settings.WeeklyEnabled);
         return new NewsletterStatusDto(true, configured);
     }
@@ -63,7 +69,7 @@ internal sealed class NewsletterService : INewsletterService
             WeeklyEnabled = request.WeeklyEnabled,
             WeeklyDay = NormalizeDay(request.WeeklyDay),
             WeeklyTime = request.WeeklyTime.Trim(),
-            PublicBaseUrl = request.PublicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty,
+            PublicBaseUrl = current.PublicBaseUrl,
             LastWeeklySentAt = current.LastWeeklySentAt
         };
 
@@ -108,13 +114,13 @@ internal sealed class NewsletterService : INewsletterService
             return;
 
         var since = DateTimeOffset.UtcNow.AddDays(-7);
-        var items = await LoadDigestItemsAsync(since, cancellationToken);
         var baseUrl = ResolveBaseUrl(settings);
 
         var users = await _db.Users.AsNoTracking()
             .Where(u => u.IsActive)
             .ToListAsync(cancellationToken);
 
+        var sentCount = 0;
         foreach (var user in users)
         {
             if (!await _subscriptionStore.IsSubscribedAsync(user.Id, cancellationToken))
@@ -126,14 +132,23 @@ internal sealed class NewsletterService : INewsletterService
 
             try
             {
-                var theme = NewsletterTemplates.GetTheme(user.SkinId);
-                var html = NewsletterTemplates.RenderWeeklyDigest(user.Username, baseUrl, theme, items);
-                var plain = NewsletterTemplates.WeeklyPlainText(user.Username, baseUrl, items);
+                var (html, plain) = await NewsletterWeeklyComposer.BuildAsync(
+                    _db,
+                    _plugins,
+                    _services,
+                    user.Username,
+                    user.SkinId,
+                    baseUrl,
+                    since,
+                    _logger,
+                    cancellationToken);
+
                 await _emailService.SendAsync(new SendEmailRequest(
                     email,
                     "Your CherryBox weekly update",
                     plain,
                     html), cancellationToken);
+                sentCount++;
             }
             catch (Exception ex)
             {
@@ -141,10 +156,17 @@ internal sealed class NewsletterService : INewsletterService
             }
         }
 
-        var current = _settingsStore.Get();
-        current.LastWeeklySentAt = DateTimeOffset.UtcNow.UtcDateTime.ToString("O");
-        _settingsStore.Save(current);
-        _logger.LogInformation("Weekly newsletter sent to subscribed users.");
+        if (sentCount > 0)
+        {
+            var current = _settingsStore.Get();
+            current.LastWeeklySentAt = DateTimeOffset.UtcNow.ToString("O");
+            _settingsStore.Save(current);
+            _logger.LogInformation("Weekly newsletter sent to {Count} subscribed user(s).", sentCount);
+        }
+        else
+        {
+            _logger.LogWarning("Weekly newsletter run completed without sending any email.");
+        }
     }
 
     public async Task<NewsletterSubscriptionDto> GetSubscriptionAsync(
@@ -161,46 +183,31 @@ internal sealed class NewsletterService : INewsletterService
     public Task UpdateSubscriptionAsync(Guid userId, bool subscribed, CancellationToken cancellationToken = default) =>
         _subscriptionStore.SetSubscribedAsync(userId, subscribed, cancellationToken);
 
+    public bool ShouldSendWeeklyDigestNow(DateTimeOffset utcNow) => ShouldSendWeeklyNow(utcNow);
+
     internal bool ShouldSendWeeklyNow(DateTimeOffset utcNow)
     {
         var settings = _settingsStore.Get();
-        if (!settings.WeeklyEnabled)
+        if (!settings.WeeklyEnabled || !_emailService.GetStatus().Configured)
             return false;
 
         if (!TryParseWeeklyTime(settings.WeeklyTime, out var scheduledTime))
             return false;
 
-        if (!string.Equals(utcNow.DayOfWeek.ToString(), NormalizeDay(settings.WeeklyDay), StringComparison.OrdinalIgnoreCase))
+        var localNow = CherryBoxTimeZone.ToConfiguredLocalTime(utcNow, _config.Current.TimeZoneId);
+        if (!string.Equals(localNow.DayOfWeek.ToString(), NormalizeDay(settings.WeeklyDay), StringComparison.OrdinalIgnoreCase))
             return false;
 
-        if (utcNow.TimeOfDay < scheduledTime || utcNow.TimeOfDay >= scheduledTime.Add(TimeSpan.FromHours(1)))
+        if (localNow.TimeOfDay < scheduledTime || localNow.TimeOfDay >= scheduledTime.Add(TimeSpan.FromHours(1)))
             return false;
 
         if (DateTimeOffset.TryParse(settings.LastWeeklySentAt, out var lastSent)
-            && lastSent > utcNow.AddHours(-20))
+            && lastSent.ToUniversalTime() > utcNow.AddHours(-20))
         {
             return false;
         }
 
         return true;
-    }
-
-    private async Task<IReadOnlyList<DigestItem>> LoadDigestItemsAsync(
-        DateTimeOffset since,
-        CancellationToken cancellationToken)
-    {
-        var media = await _db.MediaItems.AsNoTracking()
-            .Where(m => m.UpdatedAt >= since || m.CreatedAt >= since)
-            .OrderByDescending(m => m.UpdatedAt)
-            .Take(DigestItemLimit)
-            .ToListAsync(cancellationToken);
-
-        var baseUrl = ResolveBaseUrl(_settingsStore.Get());
-        return media.Select(m => new DigestItem(
-            string.IsNullOrWhiteSpace(m.Title) ? m.FileName : m.Title!,
-            FormatMediaType(m.MediaType),
-            BuildMediaUrl(baseUrl, m.Id, m.MediaType),
-            m.UpdatedAt)).ToList();
     }
 
     private async Task<string?> ResolveEmailAsync(CherryBox.Core.Entities.User user, CancellationToken cancellationToken)
@@ -212,37 +219,15 @@ internal sealed class NewsletterService : INewsletterService
         return user.Username.Contains('@', StringComparison.Ordinal) ? user.Username.Trim() : null;
     }
 
-    private static string ResolveBaseUrl(NewsletterSettings settings) =>
-        string.IsNullOrWhiteSpace(settings.PublicBaseUrl) ? "http://localhost:8787" : settings.PublicBaseUrl;
+    private string ResolveBaseUrl(NewsletterSettings settings) =>
+        CherryBoxUrlSettings.ResolvePublicBaseUrl(_config.Current, settings.PublicBaseUrl, _config.Current.Port);
 
-    private static string BuildMediaUrl(string baseUrl, Guid id, MediaType mediaType)
-    {
-        var path = mediaType switch
-        {
-            MediaType.Video => $"/video/{id}",
-            MediaType.Audio => $"/audio/{id}",
-            MediaType.Story => $"/story/{id}",
-            MediaType.Image => $"/picture/{id}",
-            _ => $"/media/{id}"
-        };
-        return $"{baseUrl.TrimEnd('/')}{path}";
-    }
-
-    private static string FormatMediaType(MediaType mediaType) => mediaType switch
-    {
-        MediaType.Video => "Video",
-        MediaType.Audio => "Audio",
-        MediaType.Story => "Story",
-        MediaType.Image => "Picture",
-        _ => mediaType.ToString()
-    };
-
-    private static NewsletterSettingsDto ToDto(NewsletterSettings settings) => new(
+    private NewsletterSettingsDto ToDto(NewsletterSettings settings) => new(
         settings.WelcomeEnabled,
         settings.WeeklyEnabled,
         settings.WeeklyDay,
         settings.WeeklyTime,
-        settings.PublicBaseUrl);
+        ResolveBaseUrl(settings));
 
     private static bool TryParseWeeklyTime(string value, out TimeSpan time)
     {

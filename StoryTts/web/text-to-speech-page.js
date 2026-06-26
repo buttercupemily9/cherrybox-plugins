@@ -14,6 +14,17 @@
     try { return new Date(value).toLocaleString(); } catch { return value; }
   }
 
+  function audioFolderOptions(folders, selectedId) {
+    return ['<option value="">Select audio folder…</option>']
+      .concat(folders
+        .filter(function (f) { return f.contentKind === 'Audio' || f.contentKind === 'Mix'; })
+        .map(function (f) {
+          var selected = selectedId && f.id === selectedId ? ' selected' : '';
+          return '<option value="' + f.id + '"' + selected + '>' + f.path + ' (' + f.contentKind + ')</option>';
+        }))
+      .join('');
+  }
+
   function renderWorker(status) {
     var current = status.currentJob
       ? ' — processing ' + (status.currentJob.storyTitle || status.currentJob.storyMediaItemId)
@@ -41,6 +52,14 @@
     }).join('');
   }
 
+  async function loadSettings() {
+    var settings = await api.getSettings();
+    var folders = await api.listLibraryFolders();
+    document.getElementById('backgroundWorkerEnabled').checked = !!settings.backgroundWorkerEnabled;
+    document.getElementById('autoLinkOnComplete').checked = settings.autoLinkOnComplete !== false;
+    document.getElementById('audioFolder').innerHTML = audioFolderOptions(folders, settings.audioLibraryFolderId);
+  }
+
   async function refresh() {
     var status = await api.workerStatus();
     var jobs = await api.listJobs(100);
@@ -57,6 +76,21 @@
       return '<option value="' + story.id + '">' + label + '</option>';
     }).join('');
   }
+
+  document.getElementById('settings-form').onsubmit = async function (e) {
+    e.preventDefault();
+    try {
+      await api.updateSettings({
+        audioLibraryFolderId: document.getElementById('audioFolder').value || null,
+        backgroundWorkerEnabled: document.getElementById('backgroundWorkerEnabled').checked,
+        autoLinkOnComplete: document.getElementById('autoLinkOnComplete').checked
+      });
+      showMessage('Settings saved.', 'success');
+      await refresh();
+    } catch (err) {
+      showMessage(err.message || 'Failed to save settings', 'error');
+    }
+  };
 
   document.getElementById('start-worker').onclick = async function () {
     try {
@@ -100,7 +134,7 @@
     }
   };
 
-  Promise.all([loadStories(), refresh()])
+  Promise.all([loadSettings(), loadStories(), refresh()])
     .then(function () {
       pollTimer = window.setInterval(function () {
         refresh().catch(function () { /* ignore transient poll errors */ });

@@ -86,6 +86,8 @@ public abstract class HtmlStorySiteImporterBase : IStorySiteImporter
 
     public bool CanImport(Uri url) => MatchesHost(url);
 
+    public virtual bool SupportsSiteLogin => false;
+
     public virtual async Task<StoryImportPageResult> FetchPageAsync(StoryImportPageRequest request, CancellationToken cancellationToken = default)
     {
         var html = await request.Http.GetStringAsync(request.Url, cancellationToken);

@@ -27,6 +27,7 @@ public sealed class PasswordResetPlugin : ICherryBoxPlugin, IPluginServiceContri
             return new PasswordResetService(
                 sp.GetRequiredService<CherryBox.Data.CherryBoxDbContext>(),
                 sp.GetRequiredService<CherryBox.Auth.IAuthService>(),
+                sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
                 settingsStore,
                 tokenStore,
                 email,

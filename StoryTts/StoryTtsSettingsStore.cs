@@ -5,12 +5,6 @@ namespace CherryBox.StoryTts.Plugin;
 
 internal sealed class StoryTtsSettings
 {
-    public string? ApiKey { get; set; }
-    public string Model { get; set; } = "tts-kokoro";
-    public string Voice { get; set; } = "af_sky";
-    public string ResponseFormat { get; set; } = "mp3";
-    public double Speed { get; set; } = 1.0;
-    public int MaxCharsPerRequest { get; set; } = 4000;
     public Guid? AudioLibraryFolderId { get; set; }
     public bool BackgroundWorkerEnabled { get; set; } = true;
     public bool AutoLinkOnComplete { get; set; } = true;
@@ -69,12 +63,6 @@ internal sealed class StoryTtsSettingsStore
 
     private static StoryTtsSettings Clone(StoryTtsSettings settings) => new()
     {
-        ApiKey = settings.ApiKey,
-        Model = settings.Model,
-        Voice = settings.Voice,
-        ResponseFormat = settings.ResponseFormat,
-        Speed = settings.Speed,
-        MaxCharsPerRequest = settings.MaxCharsPerRequest,
         AudioLibraryFolderId = settings.AudioLibraryFolderId,
         BackgroundWorkerEnabled = settings.BackgroundWorkerEnabled,
         AutoLinkOnComplete = settings.AutoLinkOnComplete

@@ -13,7 +13,6 @@ internal sealed class StoryTtsService : IStoryTtsService
     private readonly StoryTtsSettingsStore _settings;
     private readonly StoryTtsJobStore _jobs;
     private readonly StoryTtsWorkerState _workerState;
-    private readonly VeniceTtsClient _venice;
     private readonly ILogger<StoryTtsService> _logger;
 
     public StoryTtsService(
@@ -21,14 +20,12 @@ internal sealed class StoryTtsService : IStoryTtsService
         StoryTtsSettingsStore settings,
         StoryTtsJobStore jobs,
         StoryTtsWorkerState workerState,
-        VeniceTtsClient venice,
         ILogger<StoryTtsService> logger)
     {
         _scopeFactory = scopeFactory;
         _settings = settings;
         _jobs = jobs;
         _workerState = workerState;
-        _venice = venice;
         _logger = logger;
     }
 
@@ -42,16 +39,6 @@ internal sealed class StoryTtsService : IStoryTtsService
     {
         var updated = _settings.Update(settings =>
         {
-            if (request.ClearApiKey)
-                settings.ApiKey = null;
-            else if (!string.IsNullOrWhiteSpace(request.ApiKey))
-                settings.ApiKey = request.ApiKey.Trim();
-
-            settings.Model = string.IsNullOrWhiteSpace(request.Model) ? "tts-kokoro" : request.Model.Trim();
-            settings.Voice = string.IsNullOrWhiteSpace(request.Voice) ? "af_sky" : request.Voice.Trim();
-            settings.ResponseFormat = string.IsNullOrWhiteSpace(request.ResponseFormat) ? "mp3" : request.ResponseFormat.Trim();
-            settings.Speed = Math.Clamp(request.Speed, 0.25, 4.0);
-            settings.MaxCharsPerRequest = Math.Clamp(request.MaxCharsPerRequest, 500, 12000);
             settings.AudioLibraryFolderId = request.AudioLibraryFolderId;
             settings.BackgroundWorkerEnabled = request.BackgroundWorkerEnabled;
             settings.AutoLinkOnComplete = request.AutoLinkOnComplete;
@@ -119,26 +106,6 @@ internal sealed class StoryTtsService : IStoryTtsService
         return Task.CompletedTask;
     }
 
-    public async Task<StoryTtsTestResult> TestConnectionAsync(StoryTtsTestRequest request, CancellationToken cancellationToken = default)
-    {
-        var settings = _settings.Get();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-            return new StoryTtsTestResult(false, "Venice API key is not configured.");
-
-        try
-        {
-            var sample = string.IsNullOrWhiteSpace(request.SampleText)
-                ? "CherryBox story text to speech test."
-                : request.SampleText.Trim();
-            await _venice.SynthesizeAsync(settings.ApiKey, sample, settings, cancellationToken);
-            return new StoryTtsTestResult(true, "Venice text-to-speech connection succeeded.");
-        }
-        catch (Exception ex)
-        {
-            return new StoryTtsTestResult(false, ex.Message);
-        }
-    }
-
     private static async Task<List<Core.Entities.MediaItem>> QueryStoriesAsync(
         CherryBoxDbContext db,
         EnqueueStoryTtsRequest request,
@@ -165,12 +132,6 @@ internal sealed class StoryTtsService : IStoryTtsService
     }
 
     private static StoryTtsSettingsDto ToDto(StoryTtsSettings settings) => new(
-        !string.IsNullOrWhiteSpace(settings.ApiKey),
-        settings.Model,
-        settings.Voice,
-        settings.ResponseFormat,
-        settings.Speed,
-        settings.MaxCharsPerRequest,
         settings.AudioLibraryFolderId,
         settings.BackgroundWorkerEnabled,
         settings.AutoLinkOnComplete);
