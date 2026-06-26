@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 17,
+  "catalogVersion": 18,
   "plugins": [
     {
       "id": "backup",
@@ -65,13 +65,13 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.1.9",
+      "version": "1.2.0",
       "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Fix settings save validation error by dropping publicBaseUrl from the update API (now in General settings)."
+      "changelog": "Fix settings save on older hosts by resending publicBaseUrl (optional) so model validation passes."
     },
     {
       "id": "view-time",

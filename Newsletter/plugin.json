@@ -1,7 +1,7 @@
 {
   "id": "newsletter",
   "name": "Newsletter",
-  "version": "1.1.9",
+  "version": "1.2.0",
   "entryAssembly": "Newsletter.Plugin.dll",
   "entryType": "CherryBox.Newsletter.Plugin.NewsletterPlugin",
   "settingsTabs": [

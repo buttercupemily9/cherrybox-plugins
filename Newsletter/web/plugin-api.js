@@ -89,7 +89,10 @@ function toTimeInputValue(value) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+let loadedSettings = null;
+
 function fillForm(settings) {
+  loadedSettings = settings || {};
   document.getElementById('welcomeEnabled').checked = readBoolSetting(settings, 'welcomeEnabled', true);
   document.getElementById('weeklyEnabled').checked = readBoolSetting(settings, 'weeklyEnabled', false);
   document.getElementById('weeklyDay').value = settings.weeklyDay || settings.WeeklyDay || 'Sunday';
@@ -102,6 +105,9 @@ function readFormValues() {
     weeklyEnabled: document.getElementById('weeklyEnabled').checked,
     weeklyDay: document.getElementById('weeklyDay').value,
     weeklyTime: toTimeInputValue(document.getElementById('weeklyTime').value),
+    // Sent for backward compatibility with hosts that still require this field.
+    // The public URL itself is managed under Settings → General and is ignored here.
+    publicBaseUrl: loadedSettings?.publicBaseUrl ?? loadedSettings?.PublicBaseUrl ?? '',
   };
 }
 

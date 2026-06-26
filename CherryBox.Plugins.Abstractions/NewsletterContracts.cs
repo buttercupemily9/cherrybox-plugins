@@ -13,7 +13,8 @@ public sealed record UpdateNewsletterSettingsRequest(
     bool WelcomeEnabled,
     bool WeeklyEnabled,
     string WeeklyDay,
-    string WeeklyTime);
+    string WeeklyTime,
+    string? PublicBaseUrl = null);
 
 public sealed record NewsletterSubscriptionDto(
     bool Available,
