@@ -80,13 +80,9 @@ internal static class NewsletterTemplates
             : $"background:{theme.HeaderGradient};";
 
         var introHtml = BuildIntroHtml(username, narratorName, aiIntro);
-        var listHeading = string.IsNullOrWhiteSpace(aiIntro)
-            ? "Fresh filth added this week — pick something and get off:"
-            : "Here's what I want you to stroke to:";
-
-        var itemRows = items.Count == 0
-            ? "<p style=\"margin:0;line-height:1.6;\">Nothing new dropped this week, but your library is still packed with stuff to cum to. Open CherryBox and find what makes you leak.</p>"
-            : string.Join("", items.Select(RenderItemRow));
+        var newest = items.Where(i => i.Section == NewsletterDigestSection.NewThisWeek).ToList();
+        var recommended = items.Where(i => i.Section == NewsletterDigestSection.Recommended).ToList();
+        var itemRows = BuildSectionHtml(newest, recommended, theme);
 
         return $"""
             <!DOCTYPE html>
@@ -98,12 +94,11 @@ internal static class NewsletterTemplates
                   <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
                     <tr><td style="{headerStyle}color:#ffffff;padding:28px 32px;">
                       <h1 style="margin:0;font-size:28px;">This week in CherryBox</h1>
-                      <p style="margin:8px 0 0;opacity:0.95;">From {safeNarrator} · Fresh picks for {safeName}</p>
+                      <p style="margin:8px 0 0;opacity:0.95;">From {safeNarrator} · Just for {safeName}</p>
                     </td></tr>
                     <tr><td style="padding:32px;">
                       {introHtml}
-                      <p style="line-height:1.6;margin:0 0 20px;">{Escape(listHeading)}</p>
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">{itemRows}</table>
+                      {itemRows}
                       <p style="margin:28px 0 0;">
                         <a href="{safeUrl}" style="display:inline-block;background:{theme.PrimaryColor};color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600;">Browse CherryBox</a>
                       </p>
@@ -115,7 +110,41 @@ internal static class NewsletterTemplates
             </html>
             """;
 
-        string RenderItemRow(NewsletterDigestItem item)
+        string BuildSectionHtml(
+            IReadOnlyList<NewsletterDigestItem> newest,
+            IReadOnlyList<NewsletterDigestItem> recommended,
+            SkinTheme theme)
+        {
+            if (newest.Count == 0 && recommended.Count == 0)
+            {
+                return """
+                    <p style="margin:0;line-height:1.6;">Nothing new dropped this week, but your library is still packed with stuff to cum to. Open CherryBox and find what makes you leak.</p>
+                    """;
+            }
+
+            var sections = new List<string>();
+            if (newest.Count > 0)
+            {
+                sections.Add($"""
+                    <p style="line-height:1.6;margin:0 0 12px;font-weight:600;">Fresh in your library this week</p>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 24px;">{string.Join("", newest.Select(RenderItemRow))}</table>
+                    """);
+            }
+
+            if (recommended.Count > 0)
+            {
+                sections.Add($"""
+                    <p style="line-height:1.6;margin:0 0 12px;font-weight:600;">A few things I picked just for you</p>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">{string.Join("", recommended.Select(RenderItemRow))}</table>
+                    """);
+            }
+
+            return string.Join("", sections);
+
+            string RenderItemRow(NewsletterDigestItem item) => RenderDigestItemRow(item, theme);
+        }
+
+        string RenderDigestItemRow(NewsletterDigestItem item, SkinTheme theme)
         {
             var metaParts = new List<string> { item.MediaType, item.UpdatedAt.ToString("MMM d, yyyy") };
             if (!string.IsNullOrWhiteSpace(item.Performers))
@@ -172,14 +201,14 @@ internal static class NewsletterTemplates
         string? aiIntro = null)
     {
         var intro = BuildIntroPlain(username, narratorName, aiIntro);
-        var lines = items.Count == 0
-            ? ["Nothing new this week — open CherryBox anyway and find something to cum to."]
-            : items.Select(FormatItemPlain).ToArray();
+        var newest = items.Where(i => i.Section == NewsletterDigestSection.NewThisWeek).ToList();
+        var recommended = items.Where(i => i.Section == NewsletterDigestSection.Recommended).ToList();
+        var body = BuildSectionPlain(newest, recommended);
 
         return $"""
             {intro}
 
-            {string.Join(Environment.NewLine, lines)}
+            {body}
 
             Browse CherryBox: {baseUrl.TrimEnd('/')}
             """;
@@ -191,7 +220,7 @@ internal static class NewsletterTemplates
         {
             return $"""
                 <p style="font-size:18px;margin:0 0 16px;">Hi {Escape(username)},</p>
-                <p style="line-height:1.7;margin:0 0 16px;">It's {Escape(narratorName)} with your weekly CherryBox filth — open the picks below and stroke to whatever makes you throb.</p>
+                <p style="line-height:1.7;margin:0 0 16px;">It's {Escape(narratorName)} — I couldn't wait to tell you what I've been watching and what I picked for you. Open the links below and get lost in it.</p>
                 """;
         }
 
@@ -206,13 +235,38 @@ internal static class NewsletterTemplates
     private static string BuildIntroPlain(string username, string narratorName, string? aiIntro)
     {
         if (string.IsNullOrWhiteSpace(aiIntro))
-            return $"Hi {username},\n\nIt's {narratorName} with your weekly CherryBox filth:";
+            return $"Hi {username},\n\nIt's {narratorName} — I picked some stuff I think you're going to love:";
 
         return PersonalizeIntro(aiIntro, username);
     }
 
     private static string PersonalizeIntro(string aiIntro, string username) =>
         aiIntro.Replace("[NAME]", username, StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildSectionPlain(
+        IReadOnlyList<NewsletterDigestItem> newest,
+        IReadOnlyList<NewsletterDigestItem> recommended)
+    {
+        if (newest.Count == 0 && recommended.Count == 0)
+            return "Nothing new this week — open CherryBox anyway and find something to cum to.";
+
+        var sections = new List<string>();
+        if (newest.Count > 0)
+        {
+            sections.Add("Fresh in your library this week:");
+            sections.AddRange(newest.Select(FormatItemPlain));
+        }
+
+        if (recommended.Count > 0)
+        {
+            if (sections.Count > 0)
+                sections.Add(string.Empty);
+            sections.Add("A few things I picked just for you:");
+            sections.AddRange(recommended.Select(FormatItemPlain));
+        }
+
+        return string.Join(Environment.NewLine, sections);
+    }
 
     private static string FormatItemPlain(NewsletterDigestItem item)
     {
