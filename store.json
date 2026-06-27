@@ -1,5 +1,5 @@
-﻿{
-  "catalogVersion": 25,
+{
+  "catalogVersion": 26,
   "plugins": [
     {
       "id": "achievements",
@@ -10,7 +10,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Achievements",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Achievements/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Initial achievements plugin with in-app viewing milestones."
     },
     {
@@ -22,7 +22,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Ai",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Drop IAiImageService interface reference so plugins load on hosts without that shared type."
     },
     {
@@ -34,7 +34,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Backup",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Backup/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Self-contained Backup settings tab with HTML UI in the plugin web folder."
     },
     {
@@ -46,7 +46,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Download",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Fix download covers and WebM GIF handling; improve plugin UI message contrast."
     },
     {
@@ -58,7 +58,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Email",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Per-send From display name override; inline cid: attachments with Content-Disposition inline."
     },
     {
@@ -70,7 +70,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ImageDownload",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Fix download cover routing and WebM GIF handling."
     },
     {
@@ -82,7 +82,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Candy Cherry and Maxxx Cherry narrator personas with per-voice From name; fix inline email thumbnails."
     },
     {
@@ -94,7 +94,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/PasswordReset",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Split SMTP into Email plugin; reset settings now cover tokens and public URL only."
     },
     {
@@ -106,7 +106,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Social",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Social/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Initial social plugin with messaging, friends, and media engagement."
     },
     {
@@ -118,7 +118,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryCovers",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Resolve AI image generation via reflection for compatibility with older host abstractions."
     },
     {
@@ -130,7 +130,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StorySites",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Story import plugin for supported external sites."
     },
     {
@@ -142,7 +142,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryTts",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Split Venice AI settings into the AI plugin; this plugin now handles the TTS queue only."
     },
     {
@@ -154,7 +154,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Transcoder",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Fix TranscodeApi load order on plugin settings pages."
     },
     {
@@ -166,7 +166,7 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ViewTime",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/ViewTime/icon.png",
-      "screenshotUrls": {},
+      "screenshotUrls": [],
       "changelog": "Move account advanced time management into a plugin settings tab."
     }
   ]

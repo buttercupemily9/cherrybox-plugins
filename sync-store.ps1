@@ -23,6 +23,29 @@ function Get-DefaultIconUrl([string]$folder) {
     return "https://raw.githubusercontent.com/$RepoOwner/$RepoName/$Branch/StorySites/icon.png"
 }
 
+function Get-NormalizedScreenshotUrls($value) {
+    if ($null -eq $value) { return @() }
+    if ($value -is [string]) { return @([string]$value) }
+    if ($value -is [System.Array] -or $value -is [System.Collections.IList]) {
+        return @($value | ForEach-Object { [string]$_ })
+    }
+
+    return @()
+}
+
+function Format-ScreenshotUrlsJson($value) {
+    $items = Get-NormalizedScreenshotUrls $value
+    if ($items.Count -eq 0) { return "[]" }
+
+    $encoded = ($items | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join ', '
+    return "[$encoded]"
+}
+
+function Write-StoreJson([string]$path, [string]$content) {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
+}
+
 $existing = @{}
 $catalogVersion = 1
 if (Test-Path $StorePath) {
@@ -56,7 +79,7 @@ Get-ChildItem -Path $root -Directory | ForEach-Object {
     $prev = if ($existing.ContainsKey($id)) { $existing[$id] } else { $null }
 
     if ($null -eq $prev) {
-        $versionChanges.Add("$id (new — add a changelog in store.json)") | Out-Null
+        $versionChanges.Add("$id (new - update changelog in store.json)") | Out-Null
     }
     elseif ([string]$prev.version -ne $version) {
         $versionChanges.Add("$id ($($prev.version) -> $version)") | Out-Null
@@ -81,7 +104,7 @@ Get-ChildItem -Path $root -Directory | ForEach-Object {
         author = if ($prev -and $prev.author) { [string]$prev.author } else { "CherryBox" }
         homepage = if ($prev -and $prev.homepage) { [string]$prev.homepage } else { Get-DefaultHomepage $folder }
         iconUrl = if ($prev -and $prev.iconUrl) { [string]$prev.iconUrl } else { Get-DefaultIconUrl $folder }
-        screenshotUrls = if ($prev -and $prev.screenshotUrls) { @($prev.screenshotUrls) } else { @() }
+        screenshotUrls = Get-NormalizedScreenshotUrls $(if ($prev) { $prev.screenshotUrls } else { $null })
         changelog = if ($prev -and $prev.changelog) { [string]$prev.changelog } else { "Initial release." }
     }
 
@@ -111,7 +134,7 @@ $lines.Add('  "catalogVersion": ' + $catalogVersion + ',') | Out-Null
 $lines.Add('  "plugins": [') | Out-Null
 for ($i = 0; $i -lt $sorted.Count; $i++) {
     $plugin = $sorted[$i]
-    $screenshots = if ($plugin.screenshotUrls.Count -eq 0) { "[]" } else { ($plugin.screenshotUrls | ConvertTo-Json -Compress) }
+    $screenshots = Format-ScreenshotUrlsJson $plugin.screenshotUrls
     $lines.Add("    {") | Out-Null
     $lines.Add('      "id": "' + ($plugin.id -replace '"', '\"') + '",') | Out-Null
     $lines.Add('      "folder": "' + ($plugin.folder -replace '"', '\"') + '",') | Out-Null
@@ -128,7 +151,7 @@ for ($i = 0; $i -lt $sorted.Count; $i++) {
 }
 $lines.Add("  ]") | Out-Null
 $lines.Add("}") | Out-Null
-($lines -join [Environment]::NewLine) + [Environment]::NewLine | Set-Content -Path $StorePath -Encoding UTF8 -NoNewline
+Write-StoreJson $StorePath (($lines -join [Environment]::NewLine) + [Environment]::NewLine)
 
 Write-Host "Updated $StorePath"
 Write-Host "  catalogVersion: $catalogVersion"
