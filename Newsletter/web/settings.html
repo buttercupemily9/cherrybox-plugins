@@ -11,6 +11,7 @@
     .inline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.85rem; }
     .success { color: #1b5e20; background: #e6f4ea; border: 1px solid #2f7d32; padding: 0.65rem 0.85rem; border-radius: 8px; font-weight: 600; margin-top: 0.75rem; }
     .test-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 0.5rem; }
+    .test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 0.5rem; }
   </style>
   <script src="cherrybox/cherrybox-plugin-shell.js" defer></script>
   <script src="cherrybox/cherrybox-plugin-api.js" defer></script>
@@ -56,9 +57,36 @@
 
     <div class="settings-subsection">
       <h4>Test send</h4>
-      <p class="meta">Send sample emails to the address on your admin account (Settings → Accounts). Templates match the real welcome and weekly newsletters.</p>
+      <p class="meta">Send sample emails to the address on your admin account (Settings → Accounts). Weekly tests use narrator voice rules: gay men and straight women hear from Maxxx Cherry; straight men and gay women hear from Candy Cherry; bi readers get a random pick at send time.</p>
       <div class="test-actions">
         <button type="button" id="testWelcomeBtn" class="secondary">Send test welcome email</button>
+      </div>
+      <div class="test-grid">
+        <div class="form-row">
+          <label for="testAudienceGender">Test as reader gender</label>
+          <select id="testAudienceGender">
+            <option value="Female">Woman</option>
+            <option value="Male">Man</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="testAudienceOrientation">Test as reader orientation</label>
+          <select id="testAudienceOrientation">
+            <option value="Straight">Straight</option>
+            <option value="Gay">Gay</option>
+            <option value="Bi">Bi</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="testVoice">Narrator</label>
+          <select id="testVoice">
+            <option value="">Auto (from rules above)</option>
+            <option value="Male">Maxxx Cherry</option>
+            <option value="Female">Candy Cherry</option>
+          </select>
+        </div>
+      </div>
+      <div class="test-actions">
         <button type="button" id="testWeeklyBtn" class="secondary">Send test weekly newsletter</button>
       </div>
     </div>

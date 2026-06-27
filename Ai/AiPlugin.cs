@@ -9,7 +9,7 @@ public sealed class AiPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "ai";
     public string Name => "AI";
-    public string Version => "1.0.0";
+    public string Version => "1.2.1";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -19,11 +19,13 @@ public sealed class AiPlugin : ICherryBoxPlugin, IPluginServiceContributor
         _settingsStore = new AiSettingsStore(context.DataDirectory);
         var venice = new VeniceTtsClient(new HttpClient { Timeout = TimeSpan.FromMinutes(10) });
         var chat = new VeniceChatClient(new HttpClient { Timeout = TimeSpan.FromMinutes(2) });
-        var aiService = new AiService(_settingsStore, venice, chat);
+        var images = new VeniceImageClient(new HttpClient { Timeout = TimeSpan.FromMinutes(5) });
+        var aiService = new AiService(_settingsStore, venice, chat, images);
 
         registry.RegisterSingleton(_settingsStore);
         registry.RegisterSingleton(venice);
         registry.RegisterSingleton(chat);
+        registry.RegisterSingleton(images);
         registry.RegisterSingleton(aiService);
         registry.RegisterScoped<IAiService>(sp =>
             sp.GetRequiredService<IPluginServiceRegistry>().Resolve<AiService>(sp)!);

@@ -68,6 +68,7 @@ internal static class NewsletterImageEmbedder
     {
         MediaType.Video => [MediaBlobKind.Thumbnail, MediaBlobKind.Poster, MediaBlobKind.PrimaryImage],
         MediaType.Image => [MediaBlobKind.PrimaryImage, MediaBlobKind.Thumbnail],
+        MediaType.Gallery => [MediaBlobKind.PrimaryImage, MediaBlobKind.Thumbnail],
         MediaType.Audio => [MediaBlobKind.Thumbnail, MediaBlobKind.PrimaryImage],
         _ => [MediaBlobKind.Thumbnail, MediaBlobKind.PrimaryImage]
     };

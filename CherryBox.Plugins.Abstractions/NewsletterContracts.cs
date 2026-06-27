@@ -24,6 +24,11 @@ public sealed record UpdateNewsletterSubscriptionRequest(bool Subscribed);
 
 public sealed record NewsletterTestResultDto(bool Success, string Message, string? SentTo);
 
+public sealed record NewsletterWeeklyTestRequest(
+    string? AudienceGender = null,
+    string? AudienceOrientation = null,
+    string? Voice = null);
+
 public interface INewsletterService
 {
     NewsletterStatusDto GetStatus();

@@ -1,7 +1,7 @@
 {
   "id": "email",
   "name": "Email",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "entryAssembly": "Email.Plugin.dll",
   "entryType": "CherryBox.Email.Plugin.EmailPlugin",
   "settingsTabs": [

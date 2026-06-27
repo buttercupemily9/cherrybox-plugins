@@ -15,6 +15,7 @@
       : 'No API key saved yet.';
     document.getElementById('model').value = settings.model || 'tts-kokoro';
     document.getElementById('chatModel').value = settings.chatModel || 'venice-uncensored';
+    document.getElementById('imageModel').value = settings.imageModel || 'venice-sd35';
     document.getElementById('voice').value = settings.voice || 'af_sky';
     document.getElementById('responseFormat').value = settings.responseFormat || 'mp3';
     document.getElementById('speed').value = settings.speed || 1;
@@ -29,6 +30,7 @@
         clearApiKey: document.getElementById('clearApiKey').checked,
         model: document.getElementById('model').value,
         chatModel: document.getElementById('chatModel').value,
+        imageModel: document.getElementById('imageModel').value,
         voice: document.getElementById('voice').value,
         responseFormat: document.getElementById('responseFormat').value,
         speed: Number(document.getElementById('speed').value),

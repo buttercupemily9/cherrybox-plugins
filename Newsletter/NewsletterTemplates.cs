@@ -69,15 +69,17 @@ internal static class NewsletterTemplates
         string baseUrl,
         SkinTheme theme,
         IReadOnlyList<NewsletterDigestItem> items,
+        string narratorName,
         string? aiIntro = null)
     {
         var safeName = Escape(username);
+        var safeNarrator = Escape(narratorName);
         var safeUrl = Escape(baseUrl.TrimEnd('/'));
         var headerStyle = theme.HeaderGradient is null
             ? $"background:{theme.PrimaryColor};"
             : $"background:{theme.HeaderGradient};";
 
-        var introHtml = BuildIntroHtml(username, aiIntro);
+        var introHtml = BuildIntroHtml(username, narratorName, aiIntro);
         var listHeading = string.IsNullOrWhiteSpace(aiIntro)
             ? "Fresh filth added this week — pick something and get off:"
             : "Here's what I want you to stroke to:";
@@ -96,7 +98,7 @@ internal static class NewsletterTemplates
                   <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.08);">
                     <tr><td style="{headerStyle}color:#ffffff;padding:28px 32px;">
                       <h1 style="margin:0;font-size:28px;">This week in CherryBox</h1>
-                      <p style="margin:8px 0 0;opacity:0.95;">Fresh picks for {safeName}</p>
+                      <p style="margin:8px 0 0;opacity:0.95;">From {safeNarrator} · Fresh picks for {safeName}</p>
                     </td></tr>
                     <tr><td style="padding:32px;">
                       {introHtml}
@@ -166,9 +168,10 @@ internal static class NewsletterTemplates
         string username,
         string baseUrl,
         IReadOnlyList<NewsletterDigestItem> items,
+        string narratorName,
         string? aiIntro = null)
     {
-        var intro = BuildIntroPlain(username, aiIntro);
+        var intro = BuildIntroPlain(username, narratorName, aiIntro);
         var lines = items.Count == 0
             ? ["Nothing new this week — open CherryBox anyway and find something to cum to."]
             : items.Select(FormatItemPlain).ToArray();
@@ -182,12 +185,13 @@ internal static class NewsletterTemplates
             """;
     }
 
-    private static string BuildIntroHtml(string username, string? aiIntro)
+    private static string BuildIntroHtml(string username, string narratorName, string? aiIntro)
     {
         if (string.IsNullOrWhiteSpace(aiIntro))
         {
             return $"""
                 <p style="font-size:18px;margin:0 0 16px;">Hi {Escape(username)},</p>
+                <p style="line-height:1.7;margin:0 0 16px;">It's {Escape(narratorName)} with your weekly CherryBox filth — open the picks below and stroke to whatever makes you throb.</p>
                 """;
         }
 
@@ -199,10 +203,10 @@ internal static class NewsletterTemplates
         return string.Join("", paragraphs);
     }
 
-    private static string BuildIntroPlain(string username, string? aiIntro)
+    private static string BuildIntroPlain(string username, string narratorName, string? aiIntro)
     {
         if (string.IsNullOrWhiteSpace(aiIntro))
-            return $"Hi {username},\n\nYour weekly dose of filth from CherryBox:";
+            return $"Hi {username},\n\nIt's {narratorName} with your weekly CherryBox filth:";
 
         return PersonalizeIntro(aiIntro, username);
     }

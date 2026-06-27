@@ -1,6 +1,30 @@
-{
-  "catalogVersion": 20,
+﻿{
+  "catalogVersion": 25,
   "plugins": [
+    {
+      "id": "achievements",
+      "folder": "Achievements",
+      "name": "Achievements",
+      "version": "1.0.0",
+      "description": "Unlock viewing badges for plays, pulses, favorites, ratings, and stories.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Achievements",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Achievements/icon.png",
+      "screenshotUrls": {},
+      "changelog": "Initial achievements plugin with in-app viewing milestones."
+    },
+    {
+      "id": "ai",
+      "folder": "Ai",
+      "name": "AI",
+      "version": "1.2.1",
+      "description": "Shared Venice API credentials, chat model, image model, and text-to-speech defaults for CherryBox plugins.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Ai",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
+      "screenshotUrls": {},
+      "changelog": "Drop IAiImageService interface reference so plugins load on hosts without that shared type."
+    },
     {
       "id": "backup",
       "folder": "Backup",
@@ -10,44 +34,56 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Backup",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Backup/icon.png",
-      "screenshotUrls": [],
+      "screenshotUrls": {},
       "changelog": "Self-contained Backup settings tab with HTML UI in the plugin web folder."
-    },
-    {
-      "id": "story-sites",
-      "folder": "StorySites",
-      "name": "Story site importers",
-      "version": "1.0.0",
-      "description": "Import stories from Reddit, Literotica, LushStories, SexStories, SexStories69, and StoriesOnline.",
-      "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StorySites",
-      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Story import plugin for supported external sites."
     },
     {
       "id": "download",
       "folder": "Download",
       "name": "Video downloader",
-      "version": "1.2.5",
+      "version": "1.2.11",
       "description": "Queue and download videos with yt-dlp, with library scan and metadata lookup. Built-in Pornhub GIF support; image sites via the Image downloader add-on.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Download",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Built-in Pornhub GIF downloads to Pictures; Downloads library folder guidance in UI."
+      "screenshotUrls": {},
+      "changelog": "Fix download covers and WebM GIF handling; improve plugin UI message contrast."
     },
     {
       "id": "email",
       "folder": "Email",
       "name": "Email",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Shared SMTP settings and email delivery for CherryBox plugins.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Email",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Add embedded inline image support for HTML emails (cid: linked resources)."
+      "screenshotUrls": {},
+      "changelog": "Per-send From display name override; inline cid: attachments with Content-Disposition inline."
+    },
+    {
+      "id": "image-download",
+      "folder": "ImageDownload",
+      "name": "Image downloader",
+      "version": "1.0.6",
+      "description": "Download images and galleries from supported sites into Pictures or Galleries libraries.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ImageDownload",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
+      "screenshotUrls": {},
+      "changelog": "Fix download cover routing and WebM GIF handling."
+    },
+    {
+      "id": "newsletter",
+      "folder": "Newsletter",
+      "name": "Newsletter",
+      "version": "1.4.1",
+      "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user. Narrator voice matches reader gender and orientation.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
+      "screenshotUrls": {},
+      "changelog": "Candy Cherry and Maxxx Cherry narrator personas with per-voice From name; fix inline email thumbnails."
     },
     {
       "id": "password-reset",
@@ -58,44 +94,8 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/PasswordReset",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
-      "screenshotUrls": [],
+      "screenshotUrls": {},
       "changelog": "Split SMTP into Email plugin; reset settings now cover tokens and public URL only."
-    },
-    {
-      "id": "newsletter",
-      "folder": "Newsletter",
-      "name": "Newsletter",
-      "version": "1.3.0",
-      "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user.",
-      "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
-      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Embed item thumbnails and cover art inline in weekly digest emails."
-    },
-    {
-      "id": "view-time",
-      "folder": "ViewTime",
-      "name": "View time limits",
-      "version": "1.0.0",
-      "description": "Limit viewing minutes, account expiry, auto-replenishment, and minute requests.",
-      "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ViewTime",
-      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/ViewTime/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Move account advanced time management into a plugin settings tab."
-    },
-    {
-      "id": "achievements",
-      "folder": "Achievements",
-      "name": "Achievements",
-      "version": "1.0.0",
-      "description": "Unlock viewing badges for plays, pulses, favorites, ratings, and stories.",
-      "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Achievements",
-      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Achievements/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Initial achievements plugin with in-app viewing milestones."
     },
     {
       "id": "social",
@@ -106,44 +106,32 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Social",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Social/icon.png",
-      "screenshotUrls": [],
+      "screenshotUrls": {},
       "changelog": "Initial social plugin with messaging, friends, and media engagement."
     },
     {
-      "id": "image-download",
-      "folder": "ImageDownload",
-      "name": "Image downloader",
-      "version": "1.0.5",
-      "description": "Download images and galleries from Rule34, ImageFap, Sex.com, Pornhub GIFs/albums, Motherless, xHamster photos, and more into Pictures or Galleries.",
+      "id": "story-covers",
+      "folder": "StoryCovers",
+      "name": "Story covers",
+      "version": "1.0.1",
+      "description": "Generate AI book-cover artwork for stories from story text, with title and author on the cover. Copies artwork to linked audio.",
       "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ImageDownload",
-      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Fix Pornhub GIF webm handling and Sex.com page fetch referer."
-    },
-    {
-      "id": "transcoder",
-      "folder": "Transcoder",
-      "name": "Media transcoder",
-      "version": "1.0.2",
-      "description": "Standardize video files in-place with configurable profiles, library assignments, and a 24/7 background transcode queue.",
-      "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Transcoder",
-      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Fix TranscodeApi load order on plugin settings pages."
-    },
-    {
-      "id": "ai",
-      "folder": "Ai",
-      "name": "AI",
-      "version": "1.1.0",
-      "description": "Shared Venice API credentials, chat model, and text-to-speech defaults for CherryBox plugins.",
-      "author": "CherryBox",
-      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Ai",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryCovers",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
-      "screenshotUrls": [],
-      "changelog": "Add Venice chat model for AI-written newsletter intros and other plugins."
+      "screenshotUrls": {},
+      "changelog": "Resolve AI image generation via reflection for compatibility with older host abstractions."
+    },
+    {
+      "id": "story-sites",
+      "folder": "StorySites",
+      "name": "Story site importers",
+      "version": "1.0.0",
+      "description": "Import stories from Reddit, Literotica, LushStories, SexStories, SexStories69, and StoriesOnline.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StorySites",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
+      "screenshotUrls": {},
+      "changelog": "Story import plugin for supported external sites."
     },
     {
       "id": "story-tts",
@@ -154,8 +142,32 @@
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryTts",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
-      "screenshotUrls": [],
+      "screenshotUrls": {},
       "changelog": "Split Venice AI settings into the AI plugin; this plugin now handles the TTS queue only."
+    },
+    {
+      "id": "transcoder",
+      "folder": "Transcoder",
+      "name": "Media transcoder",
+      "version": "1.0.2",
+      "description": "Standardize video files in-place with configurable profiles, library assignments, and a 24/7 background transcode queue.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Transcoder",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
+      "screenshotUrls": {},
+      "changelog": "Fix TranscodeApi load order on plugin settings pages."
+    },
+    {
+      "id": "view-time",
+      "folder": "ViewTime",
+      "name": "View time limits",
+      "version": "1.0.0",
+      "description": "Limit viewing minutes, account expiry, auto-replenishment, and minute requests.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ViewTime",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/ViewTime/icon.png",
+      "screenshotUrls": {},
+      "changelog": "Move account advanced time management into a plugin settings tab."
     }
   ]
 }

@@ -60,12 +60,32 @@ Reload from **Settings → Plugins** or **Settings → Store**, or `POST /api/v1
 
 ## Plugin store
 
-CherryBox **Settings → Store** always pulls the latest catalog and packages from this repo:
+CherryBox **Settings → Store** pulls the catalog and packages from this repo:
 
 | Source | URL |
 |--------|-----|
 | Catalog | [`store.json` on `main`](https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/store.json) |
-| Packages | [Latest GitHub release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) (`hello-cherrybox.zip`, `backup.zip`, …) |
+| Packages | [Latest GitHub release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) (`{plugin-id}.zip`) |
+
+### Updating the catalog
+
+**Every plugin version bump must update `store.json`.** The in-app store reads [`store.json` on `main`](https://github.com/buttercupemily9/cherrybox-plugins/blob/main/store.json), not individual `plugin.json` files.
+
+When you change a plugin:
+
+1. Bump `"version"` in that plugin's `plugin.json`.
+2. Run `.\sync-store.ps1` (syncs version/name/folder from manifests and bumps `catalogVersion` when needed).
+3. Edit the matching plugin entry's `"changelog"` in `store.json`.
+4. Commit `plugin.json` and `store.json` together.
+5. Merge to `main` so the live catalog URL and release ZIPs update (CI publishes packages on pushes to `main`).
+
+CI runs `verify-store.ps1` on every push/PR and fails if any catalog version, name, or folder is out of sync with `plugin.json`.
+
+Regenerate the catalog after adding a plugin folder:
+
+```powershell
+.\sync-store.ps1
+```
 
 ## CI / releases
 
@@ -84,12 +104,6 @@ Build packages locally:
 .\build-packages.ps1
 ```
 
-Regenerate `store.json` after adding a plugin folder:
-
-```powershell
-.\sync-store.ps1
-```
-
 When abstractions change in the main CherryBox repo, sync the vendored copy here:
 
 ```powershell
@@ -99,8 +113,17 @@ When abstractions change in the main CherryBox repo, sync the vendored copy here
 ## Create a plugin
 
 1. Add a new folder with `plugin.json`, `.csproj`, and a class implementing `ICherryBoxPlugin`.
-2. Reference `../CherryBox.Plugins.Abstractions/CherryBox.Plugins.Abstractions.csproj`.
-3. See [HelloCherryBox/HelloPlugin.cs](HelloCherryBox/HelloPlugin.cs) for a minimal example.
+2. Add the project to [CherryBox.Plugins.slnx](CherryBox.Plugins.slnx).
+3. Reference `../CherryBox.Plugins.Abstractions/CherryBox.Plugins.Abstractions.csproj`.
+4. Set `"version": "1.0.0"` (or your starting version) and optional `"description"` in `plugin.json`.
+5. Run `.\sync-store.ps1` — this **adds the plugin to `store.json`**, bumps `catalogVersion`, and fills default homepage/icon URLs.
+6. Edit the new entry's `"changelog"` in `store.json` (replace the default *Initial release.* text when needed).
+7. Commit the plugin folder **and** `store.json` together.
+8. Merge to `main` so the live catalog and release ZIPs update.
+
+Use `"storeHidden": true` in `plugin.json` only for sample or dev-only plugins that should not appear in the store (for example HelloCherryBox).
+
+See [HelloCherryBox/HelloPlugin.cs](HelloCherryBox/HelloPlugin.cs) for a minimal example.
 
 ## License
 

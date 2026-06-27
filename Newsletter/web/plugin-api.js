@@ -52,7 +52,8 @@ const api = {
   updateSettings: (data) =>
     apiRequest('/settings/newsletter', { method: 'PUT', body: JSON.stringify(data) }),
   sendTestWelcome: () => apiRequest('/settings/newsletter/test/welcome', { method: 'POST' }),
-  sendTestWeekly: () => apiRequest('/settings/newsletter/test/weekly', { method: 'POST' }),
+  sendTestWeekly: (data) =>
+    apiRequest('/settings/newsletter/test/weekly', { method: 'POST', body: JSON.stringify(data || {}) }),
 };
 
 function showMessage(text, isError = false) {
@@ -64,7 +65,7 @@ function showMessage(text, isError = false) {
 
 function setFormBusy(busy) {
   document.querySelectorAll(
-    '#settingsForm input, #settingsForm select, #settingsForm button, #testWelcomeBtn, #testWeeklyBtn',
+    '#settingsForm input, #settingsForm select, #settingsForm button, #testWelcomeBtn, #testWeeklyBtn, #testAudienceGender, #testAudienceOrientation, #testVoice',
   ).forEach((el) => {
     el.disabled = busy;
   });
@@ -181,7 +182,12 @@ function bindTestButtons() {
     showMessage('');
     setFormBusy(true);
     try {
-      const result = await api.sendTestWeekly();
+      const voice = document.getElementById('testVoice')?.value || '';
+      const result = await api.sendTestWeekly({
+        audienceGender: document.getElementById('testAudienceGender')?.value || 'Female',
+        audienceOrientation: document.getElementById('testAudienceOrientation')?.value || 'Straight',
+        voice: voice || null,
+      });
       showMessage(formatTestResult(result, 'Test weekly newsletter sent'));
     } catch (err) {
       showMessage(err instanceof Error ? err.message : 'Failed to send test weekly newsletter', true);

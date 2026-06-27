@@ -4,6 +4,7 @@ public sealed record AiSettingsDto(
     bool HasApiKey,
     string Model,
     string ChatModel,
+    string ImageModel,
     string Voice,
     string ResponseFormat,
     double Speed,
@@ -14,6 +15,7 @@ public sealed record UpdateAiSettingsRequest(
     bool ClearApiKey,
     string Model,
     string ChatModel,
+    string ImageModel,
     string Voice,
     string ResponseFormat,
     double Speed,
@@ -27,6 +29,15 @@ public sealed record AiChatRequest(
     string UserPrompt,
     string? SystemPrompt = null,
     int? MaxTokens = null);
+
+public sealed record AiImageRequest(
+    string Prompt,
+    string? Model = null,
+    int Width = 768,
+    int Height = 1024,
+    string Format = "webp");
+
+public sealed record AiImageResult(byte[] Data, string MimeType);
 
 public interface IAiService
 {
