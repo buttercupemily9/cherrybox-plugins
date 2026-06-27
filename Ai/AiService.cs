@@ -2,7 +2,7 @@ using CherryBox.Plugins.Abstractions;
 
 namespace CherryBox.Ai.Plugin;
 
-internal sealed class AiService : IAiService, IAiImageService
+internal sealed class AiService : IAiService
 {
     private readonly AiSettingsStore _settings;
     private readonly VeniceTtsClient _venice;

@@ -60,12 +60,32 @@ Reload from **Settings → Plugins** or **Settings → Store**, or `POST /api/v1
 
 ## Plugin store
 
-CherryBox **Settings → Store** always pulls the latest catalog and packages from this repo:
+CherryBox **Settings → Store** pulls the catalog and packages from this repo:
 
 | Source | URL |
 |--------|-----|
 | Catalog | [`store.json` on `main`](https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/store.json) |
-| Packages | [Latest GitHub release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) (`hello-cherrybox.zip`, `backup.zip`, …) |
+| Packages | [Latest GitHub release](https://github.com/buttercupemily9/cherrybox-plugins/releases/latest) (`{plugin-id}.zip`) |
+
+### Updating the catalog
+
+**Every plugin version bump must update `store.json`.** The in-app store reads [`store.json` on `main`](https://github.com/buttercupemily9/cherrybox-plugins/blob/main/store.json), not individual `plugin.json` files.
+
+When you change a plugin:
+
+1. Bump `"version"` in that plugin's `plugin.json`.
+2. Run `.\sync-store.ps1` (syncs version/name/folder from manifests and bumps `catalogVersion` when needed).
+3. Edit the matching plugin entry's `"changelog"` in `store.json`.
+4. Commit `plugin.json` and `store.json` together.
+5. Merge to `main` so the live catalog URL and release ZIPs update (CI publishes packages on pushes to `main`).
+
+CI runs `verify-store.ps1` on every push/PR and fails if any catalog version, name, or folder is out of sync with `plugin.json`.
+
+Regenerate the catalog after adding a plugin folder:
+
+```powershell
+.\sync-store.ps1
+```
 
 ## CI / releases
 
@@ -82,12 +102,6 @@ Build packages locally:
 
 ```powershell
 .\build-packages.ps1
-```
-
-Regenerate `store.json` after adding a plugin folder:
-
-```powershell
-.\sync-store.ps1
 ```
 
 When abstractions change in the main CherryBox repo, sync the vendored copy here:

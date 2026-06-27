@@ -47,8 +47,3 @@ public interface IAiService
     Task<byte[]> SynthesizeSpeechAsync(string text, CancellationToken cancellationToken = default);
     Task<string> CompleteChatAsync(AiChatRequest request, CancellationToken cancellationToken = default);
 }
-
-public interface IAiImageService
-{
-    Task<AiImageResult> GenerateImageAsync(AiImageRequest request, CancellationToken cancellationToken = default);
-}

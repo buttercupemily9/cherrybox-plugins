@@ -9,7 +9,7 @@ public sealed class AiPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "ai";
     public string Name => "AI";
-    public string Version => "1.2.0";
+    public string Version => "1.2.1";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -28,8 +28,6 @@ public sealed class AiPlugin : ICherryBoxPlugin, IPluginServiceContributor
         registry.RegisterSingleton(images);
         registry.RegisterSingleton(aiService);
         registry.RegisterScoped<IAiService>(sp =>
-            sp.GetRequiredService<IPluginServiceRegistry>().Resolve<AiService>(sp)!);
-        registry.RegisterScoped<IAiImageService>(sp =>
             sp.GetRequiredService<IPluginServiceRegistry>().Resolve<AiService>(sp)!);
     }
 

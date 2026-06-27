@@ -34,10 +34,6 @@ internal sealed class StoryCoverExecutor
         if (ai is null)
             return Fail(job, "AI plugin is not loaded. Install and enable the AI plugin.");
 
-        var images = _plugins.Resolve<IAiImageService>(scope.ServiceProvider);
-        if (images is null)
-            return Fail(job, "Story cover art requires AI plugin 1.2.0 or later with image generation support.");
-
         AiSettingsDto aiSettings;
         try
         {
@@ -101,13 +97,18 @@ internal sealed class StoryCoverExecutor
         AiImageResult image;
         try
         {
-            image = await images.GenerateImageAsync(
+            var generated = await StoryCoverAiImageInvoker.TryGenerateAsync(
+                ai,
                 new AiImageRequest(
                     imagePrompt,
                     Width: Math.Clamp(pluginSettings.ImageWidth, 256, 2048),
                     Height: Math.Clamp(pluginSettings.ImageHeight, 256, 2048),
                     Format: "webp"),
                 cancellationToken);
+            if (generated is null)
+                return Fail(job, "Story cover art requires AI plugin 1.2.0 or later with image generation support.");
+
+            image = generated;
         }
         catch (Exception ex)
         {

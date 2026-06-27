@@ -78,6 +78,10 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
+      - name: Verify store catalog
+        shell: pwsh
+        run: ./verify-store.ps1
+
       - name: Sync plugin theme assets
         shell: pwsh
         run: ./sync-cherrybox-theme.ps1 -Source _cherrybox/web/public/skins
