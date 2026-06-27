@@ -10,7 +10,7 @@
 <body>
   <div class="card">
     <h1>AI — Venice</h1>
-    <p class="meta">Configure Venice API credentials. TTS settings power Story text-to-speech; the chat model powers AI-written newsletters and other plugins.</p>
+    <p class="meta">Configure Venice API credentials. TTS settings power Story text-to-speech; the chat model powers AI-written newsletters, story cover prompts, and other plugins; the image model powers story cover artwork.</p>
     <div id="message" class="plugin-message" hidden></div>
     <form id="settings-form">
       <div class="settings-section">
@@ -25,7 +25,12 @@
         <div class="form-row">
           <label for="chatModel">Chat model</label>
           <input id="chatModel" type="text" placeholder="venice-uncensored" />
-          <p class="meta">Used for AI-written text such as newsletter intros.</p>
+          <p class="meta">Used for AI-written text such as newsletter intros and story cover prompts.</p>
+        </div>
+        <div class="form-row">
+          <label for="imageModel">Image model</label>
+          <input id="imageModel" type="text" placeholder="venice-sd35" />
+          <p class="meta">Used for AI-generated story cover artwork.</p>
         </div>
         <div class="form-row">
           <label for="model">TTS model</label>

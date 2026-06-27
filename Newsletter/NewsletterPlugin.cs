@@ -11,7 +11,7 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
 
     public string Id => "newsletter";
     public string Name => "Newsletter";
-    public string Version => "1.1.4";
+    public string Version => "1.4.0";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -20,9 +20,11 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
     {
         var settingsStore = new NewsletterSettingsStore(context.DataDirectory);
         var subscriptionStore = new NewsletterSubscriptionStore(context.DataDirectory);
+        var cacheStore = new NewsletterWeeklyCacheStore(context.DataDirectory);
 
         registry.RegisterSingleton(settingsStore);
         registry.RegisterSingleton(subscriptionStore);
+        registry.RegisterSingleton(cacheStore);
         registry.RegisterScoped<INewsletterService>(sp =>
         {
             var email = sp.GetRequiredService<IPluginServiceRegistry>().Resolve<IEmailService>(sp)
@@ -32,6 +34,7 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
                 sp.GetRequiredService<CherryBox.Core.Configuration.IConfigManager>(),
                 settingsStore,
                 subscriptionStore,
+                cacheStore,
                 email,
                 sp.GetRequiredService<IPluginServiceRegistry>(),
                 sp,

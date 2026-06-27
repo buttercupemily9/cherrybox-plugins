@@ -7,28 +7,9 @@ using Microsoft.Extensions.Logging;
 
 namespace CherryBox.Newsletter.Plugin;
 
-public static class NewsletterWeeklyComposer
+public static partial class NewsletterWeeklyComposer
 {
     private const int DigestItemLimit = 12;
-
-    public static async Task<(string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages)> BuildAsync(
-        CherryBoxDbContext db,
-        IPluginServiceRegistry plugins,
-        IServiceProvider services,
-        string username,
-        string? skinId,
-        string baseUrl,
-        DateTimeOffset since,
-        ILogger? logger,
-        CancellationToken cancellationToken)
-    {
-        var (items, embeddedImages) = await LoadDigestItemsAsync(db, baseUrl, since, cancellationToken);
-        var aiIntro = await TryGenerateAiIntroAsync(plugins, services, username, items, logger, cancellationToken);
-        var theme = NewsletterTemplates.GetTheme(skinId);
-        var html = NewsletterTemplates.RenderWeeklyDigest(username, baseUrl, theme, items, aiIntro);
-        var plain = NewsletterTemplates.WeeklyPlainText(username, baseUrl, items, aiIntro);
-        return (html, plain, embeddedImages);
-    }
 
     internal static async Task<(IReadOnlyList<NewsletterDigestItem> Items, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages)> LoadDigestItemsAsync(
         CherryBoxDbContext db,
@@ -111,38 +92,6 @@ public static class NewsletterWeeklyComposer
         }).ToList();
 
         return (items, embeddedImages);
-    }
-
-    private static async Task<string?> TryGenerateAiIntroAsync(
-        IPluginServiceRegistry plugins,
-        IServiceProvider services,
-        string username,
-        IReadOnlyList<NewsletterDigestItem> items,
-        ILogger? logger,
-        CancellationToken cancellationToken)
-    {
-        var ai = plugins.Resolve<IAiService>(services);
-        if (ai is null)
-            return null;
-
-        try
-        {
-            var settings = await ai.GetSettingsAsync(cancellationToken);
-            if (!settings.HasApiKey)
-                return null;
-
-            var prompt = NewsletterAiPrompts.BuildUserPrompt(username, items);
-            var text = await ai.CompleteChatAsync(
-                new AiChatRequest(prompt, NewsletterAiPrompts.SystemPrompt, MaxTokens: 500),
-                cancellationToken);
-
-            return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
-        }
-        catch (Exception ex)
-        {
-            logger?.LogWarning(ex, "AI newsletter intro generation failed; using default copy.");
-            return null;
-        }
     }
 
     private static string BuildMediaUrl(string baseUrl, Guid id, MediaType mediaType)

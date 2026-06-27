@@ -8,6 +8,7 @@
   <Project Path="ImageDownload/ImageDownload.Plugin.csproj" />
   <Project Path="Transcoder/Transcoder.Plugin.csproj" />
   <Project Path="StoryTts/StoryTts.Plugin.csproj" />
+  <Project Path="StoryCovers/StoryCovers.Plugin.csproj" />
   <Project Path="Ai/Ai.Plugin.csproj" />
   <Project Path="Achievements/Achievements.Plugin.csproj" />
   <Project Path="Social/Social.Plugin.csproj" />
