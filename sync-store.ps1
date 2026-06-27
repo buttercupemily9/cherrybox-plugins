@@ -56,7 +56,7 @@ Get-ChildItem -Path $root -Directory | ForEach-Object {
     $prev = if ($existing.ContainsKey($id)) { $existing[$id] } else { $null }
 
     if ($null -eq $prev) {
-        $versionChanges.Add("$id (new)") | Out-Null
+        $versionChanges.Add("$id (new — add a changelog in store.json)") | Out-Null
     }
     elseif ([string]$prev.version -ne $version) {
         $versionChanges.Add("$id ($($prev.version) -> $version)") | Out-Null

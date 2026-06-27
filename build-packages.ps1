@@ -22,6 +22,8 @@ $plugins = Get-ChildItem -Path $root -Directory | ForEach-Object {
     if (-not (Test-Path $manifestPath) -or $null -eq $project) { return }
 
     $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.storeHidden -eq $true) { return }
+
     [pscustomobject]@{
         Folder = $_.Name
         Id = [string]$manifest.id

@@ -113,8 +113,17 @@ When abstractions change in the main CherryBox repo, sync the vendored copy here
 ## Create a plugin
 
 1. Add a new folder with `plugin.json`, `.csproj`, and a class implementing `ICherryBoxPlugin`.
-2. Reference `../CherryBox.Plugins.Abstractions/CherryBox.Plugins.Abstractions.csproj`.
-3. See [HelloCherryBox/HelloPlugin.cs](HelloCherryBox/HelloPlugin.cs) for a minimal example.
+2. Add the project to [CherryBox.Plugins.slnx](CherryBox.Plugins.slnx).
+3. Reference `../CherryBox.Plugins.Abstractions/CherryBox.Plugins.Abstractions.csproj`.
+4. Set `"version": "1.0.0"` (or your starting version) and optional `"description"` in `plugin.json`.
+5. Run `.\sync-store.ps1` — this **adds the plugin to `store.json`**, bumps `catalogVersion`, and fills default homepage/icon URLs.
+6. Edit the new entry's `"changelog"` in `store.json` (replace the default *Initial release.* text when needed).
+7. Commit the plugin folder **and** `store.json` together.
+8. Merge to `main` so the live catalog and release ZIPs update.
+
+Use `"storeHidden": true` in `plugin.json` only for sample or dev-only plugins that should not appear in the store (for example HelloCherryBox).
+
+See [HelloCherryBox/HelloPlugin.cs](HelloCherryBox/HelloPlugin.cs) for a minimal example.
 
 ## License
 
