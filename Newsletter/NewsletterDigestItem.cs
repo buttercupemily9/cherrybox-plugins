@@ -11,4 +11,5 @@ public sealed record NewsletterDigestItem(
     string? Tags = null,
     string? Description = null,
     string? Duration = null,
-    string? SourceSite = null);
+    string? SourceSite = null,
+    string? EmbeddedImageContentId = null);

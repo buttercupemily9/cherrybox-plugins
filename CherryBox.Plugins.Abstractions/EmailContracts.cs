@@ -24,11 +24,18 @@ public sealed record SendEmailTestRequest(
     string ToAddress,
     UpdateEmailSettingsRequest? Settings = null);
 
+public sealed record EmailEmbeddedImage(
+    string ContentId,
+    byte[] Data,
+    string MimeType,
+    string? FileName = null);
+
 public sealed record SendEmailRequest(
     string ToAddress,
     string Subject,
     string? PlainTextBody = null,
-    string? HtmlBody = null);
+    string? HtmlBody = null,
+    IReadOnlyList<EmailEmbeddedImage>? EmbeddedImages = null);
 
 public sealed record SetUserEmailRequest(string? Email);
 

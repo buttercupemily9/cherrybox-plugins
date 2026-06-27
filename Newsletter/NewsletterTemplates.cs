@@ -123,11 +123,28 @@ internal static class NewsletterTemplates
             if (!string.IsNullOrWhiteSpace(item.Tags))
                 metaParts.Add(item.Tags);
 
+            var imageCell = string.IsNullOrWhiteSpace(item.EmbeddedImageContentId)
+                ? string.Empty
+                : $"""
+                    <td width="120" style="padding-right:12px;vertical-align:top;">
+                      <a href="{Escape(item.Url)}" style="text-decoration:none;">
+                        <img src="cid:{Escape(item.EmbeddedImageContentId)}" width="120" alt="{Escape(item.Title)}" style="display:block;width:120px;max-width:120px;height:auto;border-radius:8px;border:1px solid {theme.SecondaryColor};" />
+                      </a>
+                    </td>
+                    """;
+
             return $"""
                 <tr>
                   <td style="padding:12px 0;border-bottom:1px solid {theme.SecondaryColor};">
-                    <a href="{Escape(item.Url)}" style="color:{theme.PrimaryColor};font-weight:600;text-decoration:none;">{Escape(item.Title)}</a>
-                    <div style="font-size:13px;color:#64748b;margin-top:4px;">{Escape(string.Join(" · ", metaParts))}</div>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        {imageCell}
+                        <td style="vertical-align:top;">
+                          <a href="{Escape(item.Url)}" style="color:{theme.PrimaryColor};font-weight:600;text-decoration:none;">{Escape(item.Title)}</a>
+                          <div style="font-size:13px;color:#64748b;margin-top:4px;">{Escape(string.Join(" · ", metaParts))}</div>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
                 """;

@@ -132,7 +132,7 @@ internal sealed class NewsletterService : INewsletterService
 
             try
             {
-                var (html, plain) = await NewsletterWeeklyComposer.BuildAsync(
+                var (html, plain, embeddedImages) = await NewsletterWeeklyComposer.BuildAsync(
                     _db,
                     _plugins,
                     _services,
@@ -147,7 +147,8 @@ internal sealed class NewsletterService : INewsletterService
                     email,
                     "Your CherryBox weekly update",
                     plain,
-                    html), cancellationToken);
+                    html,
+                    embeddedImages), cancellationToken);
                 sentCount++;
             }
             catch (Exception ex)

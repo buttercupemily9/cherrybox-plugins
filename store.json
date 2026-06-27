@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 19,
+  "catalogVersion": 20,
   "plugins": [
     {
       "id": "backup",
@@ -41,13 +41,13 @@
       "id": "email",
       "folder": "Email",
       "name": "Email",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Shared SMTP settings and email delivery for CherryBox plugins.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Email",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with SMTP settings, user emails, and send API."
+      "changelog": "Add embedded inline image support for HTML emails (cid: linked resources)."
     },
     {
       "id": "password-reset",
@@ -65,13 +65,13 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.2.1",
+      "version": "1.3.0",
       "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Fix weekly digest SQLite query by using ISO8601 text comparison instead of untranslatable DateTimeOffset LINQ."
+      "changelog": "Embed item thumbnails and cover art inline in weekly digest emails."
     },
     {
       "id": "view-time",
