@@ -10,6 +10,15 @@ if (-not (Test-Path $StorePath)) {
     throw "Missing store catalog: $StorePath. Run .\sync-store.ps1"
 }
 
+$rawStore = [System.IO.File]::ReadAllText($StorePath)
+if ($rawStore.Contains('"screenshotUrls": {}')) {
+    throw "store.json uses invalid screenshotUrls objects. Run .\sync-store.ps1 to rewrite them as arrays."
+}
+
+if ($rawStore.Length -gt 0 -and [int][char]$rawStore[0] -eq 0xFEFF) {
+    throw "store.json must be UTF-8 without BOM. Run .\sync-store.ps1 to rewrite the catalog."
+}
+
 $store = Get-Content $StorePath -Raw | ConvertFrom-Json
 $storeById = @{}
 foreach ($entry in $store.plugins) {
