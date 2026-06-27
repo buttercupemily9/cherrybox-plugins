@@ -10,6 +10,7 @@ internal sealed class NewsletterSettings
     public string WeeklyTime { get; set; } = "09:00";
     public string PublicBaseUrl { get; set; } = "http://localhost:8787";
     public string? LastWeeklySentAt { get; set; }
+    public string? LastWeeklyPreparedWeekKey { get; set; }
 }
 
 internal sealed class NewsletterSettingsStore
@@ -61,6 +62,7 @@ internal sealed class NewsletterSettingsStore
         WeeklyDay = settings.WeeklyDay,
         WeeklyTime = settings.WeeklyTime,
         PublicBaseUrl = settings.PublicBaseUrl,
-        LastWeeklySentAt = settings.LastWeeklySentAt
+        LastWeeklySentAt = settings.LastWeeklySentAt,
+        LastWeeklyPreparedWeekKey = settings.LastWeeklyPreparedWeekKey
     };
 }

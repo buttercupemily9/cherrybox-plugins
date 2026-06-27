@@ -4,6 +4,7 @@ public sealed record AiSettingsDto(
     bool HasApiKey,
     string Model,
     string ChatModel,
+    string ImageModel,
     string Voice,
     string ResponseFormat,
     double Speed,
@@ -14,6 +15,7 @@ public sealed record UpdateAiSettingsRequest(
     bool ClearApiKey,
     string Model,
     string ChatModel,
+    string ImageModel,
     string Voice,
     string ResponseFormat,
     double Speed,
@@ -28,6 +30,15 @@ public sealed record AiChatRequest(
     string? SystemPrompt = null,
     int? MaxTokens = null);
 
+public sealed record AiImageRequest(
+    string Prompt,
+    string? Model = null,
+    int Width = 768,
+    int Height = 1024,
+    string Format = "webp");
+
+public sealed record AiImageResult(byte[] Data, string MimeType);
+
 public interface IAiService
 {
     Task<AiSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
@@ -35,4 +46,9 @@ public interface IAiService
     Task<AiTestResult> TestConnectionAsync(AiTestRequest request, CancellationToken cancellationToken = default);
     Task<byte[]> SynthesizeSpeechAsync(string text, CancellationToken cancellationToken = default);
     Task<string> CompleteChatAsync(AiChatRequest request, CancellationToken cancellationToken = default);
+}
+
+public interface IAiImageService
+{
+    Task<AiImageResult> GenerateImageAsync(AiImageRequest request, CancellationToken cancellationToken = default);
 }

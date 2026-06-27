@@ -8,6 +8,7 @@ internal sealed class AiSettings
     public string? ApiKey { get; set; }
     public string Model { get; set; } = "tts-kokoro";
     public string ChatModel { get; set; } = "venice-uncensored";
+    public string ImageModel { get; set; } = "venice-sd35";
     public string Voice { get; set; } = "af_sky";
     public string ResponseFormat { get; set; } = "mp3";
     public double Speed { get; set; } = 1.0;
@@ -79,6 +80,7 @@ internal sealed class AiSettingsStore
         ApiKey = settings.ApiKey,
         Model = settings.Model,
         ChatModel = settings.ChatModel,
+        ImageModel = settings.ImageModel,
         Voice = settings.Voice,
         ResponseFormat = settings.ResponseFormat,
         Speed = settings.Speed,

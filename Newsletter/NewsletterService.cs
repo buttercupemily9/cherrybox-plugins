@@ -1,4 +1,6 @@
 using CherryBox.Core.Configuration;
+using CherryBox.Core.Entities;
+using CherryBox.Core.Enums;
 using CherryBox.Data;
 using CherryBox.Plugins.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +14,7 @@ internal sealed class NewsletterService : INewsletterService
     private readonly IConfigManager _config;
     private readonly NewsletterSettingsStore _settingsStore;
     private readonly NewsletterSubscriptionStore _subscriptionStore;
+    private readonly NewsletterWeeklyCacheStore _cacheStore;
     private readonly IEmailService _emailService;
     private readonly IPluginServiceRegistry _plugins;
     private readonly IServiceProvider _services;
@@ -22,6 +25,7 @@ internal sealed class NewsletterService : INewsletterService
         IConfigManager config,
         NewsletterSettingsStore settingsStore,
         NewsletterSubscriptionStore subscriptionStore,
+        NewsletterWeeklyCacheStore cacheStore,
         IEmailService emailService,
         IPluginServiceRegistry plugins,
         IServiceProvider services,
@@ -31,6 +35,7 @@ internal sealed class NewsletterService : INewsletterService
         _config = config;
         _settingsStore = settingsStore;
         _subscriptionStore = subscriptionStore;
+        _cacheStore = cacheStore;
         _emailService = emailService;
         _plugins = plugins;
         _services = services;
@@ -70,7 +75,8 @@ internal sealed class NewsletterService : INewsletterService
             WeeklyDay = NormalizeDay(request.WeeklyDay),
             WeeklyTime = NormalizeWeeklyTime(request.WeeklyTime),
             PublicBaseUrl = current.PublicBaseUrl,
-            LastWeeklySentAt = current.LastWeeklySentAt
+            LastWeeklySentAt = current.LastWeeklySentAt,
+            LastWeeklyPreparedWeekKey = current.LastWeeklyPreparedWeekKey
         };
 
         _settingsStore.Save(next);
@@ -113,9 +119,23 @@ internal sealed class NewsletterService : INewsletterService
         if (!settings.WeeklyEnabled || !_emailService.GetStatus().Configured)
             return;
 
-        var since = DateTimeOffset.UtcNow.AddDays(-7);
-        var baseUrl = ResolveBaseUrl(settings);
+        var utcNow = DateTimeOffset.UtcNow;
+        var weekKey = GetWeeklySendWeekKey(utcNow);
+        if (!_cacheStore.IsReadyForWeek(weekKey))
+        {
+            _logger.LogInformation("Weekly digest cache not ready for {WeekKey}; preparing now.", weekKey);
+            await PrepareWeeklyDigestAsync(cancellationToken);
+        }
 
+        var cache = _cacheStore.GetForWeek(weekKey);
+        if (cache is null || !HasBothVoiceVersions(cache))
+        {
+            _logger.LogWarning("Weekly digest cache is still unavailable for {WeekKey}; skipping send.", weekKey);
+            return;
+        }
+
+        var baseUrl = ResolveBaseUrl(settings);
+        var embeddedImages = cache.EmbeddedImages.Select(i => i.ToEmbeddedImage()).ToList();
         var users = await _db.Users.AsNoTracking()
             .Where(u => u.IsActive)
             .ToListAsync(cancellationToken);
@@ -132,16 +152,17 @@ internal sealed class NewsletterService : INewsletterService
 
             try
             {
-                var (html, plain, embeddedImages) = await NewsletterWeeklyComposer.BuildAsync(
-                    _db,
-                    _plugins,
-                    _services,
+                var voice = ResolveVoiceForUser(user, weekKey);
+                if (!cache.Versions.TryGetValue(voice.ToString(), out var version))
+                    version = cache.Versions[NewsletterNarratorVoice.Female.ToString()];
+                var aiIntro = version.AiIntro;
+                var (html, plain, _) = NewsletterWeeklyComposer.RenderForUser(
                     user.Username,
                     user.SkinId,
                     baseUrl,
-                    since,
-                    _logger,
-                    cancellationToken);
+                    cache.Items,
+                    embeddedImages,
+                    aiIntro);
 
                 await _emailService.SendAsync(new SendEmailRequest(
                     email,
@@ -160,7 +181,7 @@ internal sealed class NewsletterService : INewsletterService
         if (sentCount > 0)
         {
             var current = _settingsStore.Get();
-            current.LastWeeklySentAt = DateTimeOffset.UtcNow.ToString("O");
+            current.LastWeeklySentAt = utcNow.ToString("O");
             _settingsStore.Save(current);
             _logger.LogInformation("Weekly newsletter sent to {Count} subscribed user(s).", sentCount);
         }
@@ -168,6 +189,72 @@ internal sealed class NewsletterService : INewsletterService
         {
             _logger.LogWarning("Weekly newsletter run completed without sending any email.");
         }
+    }
+
+    internal async Task PrepareWeeklyDigestAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = _settingsStore.Get();
+        if (!settings.WeeklyEnabled || !_emailService.GetStatus().Configured)
+            return;
+
+        var utcNow = DateTimeOffset.UtcNow;
+        var weekKey = GetWeeklySendWeekKey(utcNow);
+        if (_cacheStore.IsReadyForWeek(weekKey))
+            return;
+
+        var since = utcNow.AddDays(-7);
+        var baseUrl = ResolveBaseUrl(settings);
+
+        _logger.LogInformation("Preparing weekly digest cache for {WeekKey}.", weekKey);
+
+        var (items, embeddedImages) = await NewsletterWeeklyComposer.LoadDigestItemsAsync(
+            _db,
+            baseUrl,
+            since,
+            cancellationToken);
+
+        var maleIntro = await NewsletterWeeklyComposer.TryGenerateAiIntroAsync(
+            _plugins,
+            _services,
+            "[NAME]",
+            items,
+            NewsletterNarratorVoice.Male,
+            _logger,
+            cancellationToken);
+
+        var femaleIntro = await NewsletterWeeklyComposer.TryGenerateAiIntroAsync(
+            _plugins,
+            _services,
+            "[NAME]",
+            items,
+            NewsletterNarratorVoice.Female,
+            _logger,
+            cancellationToken);
+
+        var cache = new WeeklyDigestCache
+        {
+            WeekKey = weekKey,
+            Since = since,
+            GeneratedAt = utcNow,
+            Items = items.ToList(),
+            EmbeddedImages = embeddedImages.Select(CachedEmbeddedImage.From).ToList(),
+            Versions = new Dictionary<string, WeeklyDigestVoiceVersion>(StringComparer.OrdinalIgnoreCase)
+            {
+                [NewsletterNarratorVoice.Male.ToString()] = new() { AiIntro = maleIntro },
+                [NewsletterNarratorVoice.Female.ToString()] = new() { AiIntro = femaleIntro }
+            }
+        };
+
+        _cacheStore.Save(cache);
+
+        var current = _settingsStore.Get();
+        current.LastWeeklyPreparedWeekKey = weekKey;
+        _settingsStore.Save(current);
+
+        _logger.LogInformation(
+            "Weekly digest cache ready for {WeekKey} with {ItemCount} item(s) and male/female narrator intros.",
+            weekKey,
+            items.Count);
     }
 
     public async Task<NewsletterSubscriptionDto> GetSubscriptionAsync(
@@ -186,6 +273,26 @@ internal sealed class NewsletterService : INewsletterService
 
     /// <summary>Kept for hosts that still expose this on <see cref="INewsletterService"/>.</summary>
     public bool ShouldSendWeeklyDigestNow(DateTimeOffset utcNow) => ShouldSendWeeklyNow(utcNow);
+
+    internal bool ShouldPrepareWeeklyDigestNow(DateTimeOffset utcNow)
+    {
+        var settings = _settingsStore.Get();
+        if (!settings.WeeklyEnabled || !_emailService.GetStatus().Configured)
+            return false;
+
+        if (!IsWeeklySendDay(utcNow, settings))
+            return false;
+
+        if (!TryParseWeeklyTime(settings.WeeklyTime, out var scheduledTime))
+            return false;
+
+        var localNow = CherryBoxTimeZone.ToConfiguredLocalTime(utcNow, _config.Current.TimeZoneId);
+        if (localNow.TimeOfDay >= scheduledTime)
+            return false;
+
+        var weekKey = GetWeeklySendWeekKey(utcNow);
+        return !_cacheStore.IsReadyForWeek(weekKey);
+    }
 
     internal bool ShouldSendWeeklyNow(DateTimeOffset utcNow)
     {
@@ -212,7 +319,32 @@ internal sealed class NewsletterService : INewsletterService
         return true;
     }
 
-    private async Task<string?> ResolveEmailAsync(CherryBox.Core.Entities.User user, CancellationToken cancellationToken)
+    private static NewsletterNarratorVoice ResolveVoiceForUser(User user, string weekKey)
+    {
+        var random = user.SexualOrientation == SexualOrientation.Bi
+            ? new Random(HashCode.Combine(user.Id, weekKey.GetHashCode(StringComparison.Ordinal)))
+            : null;
+
+        return NewsletterVoiceSelector.Resolve(user.Gender, user.SexualOrientation, random);
+    }
+
+    private string GetWeeklySendWeekKey(DateTimeOffset utcNow)
+    {
+        var localNow = CherryBoxTimeZone.ToConfiguredLocalTime(utcNow, _config.Current.TimeZoneId);
+        return localNow.ToString("yyyy-MM-dd");
+    }
+
+    private bool IsWeeklySendDay(DateTimeOffset utcNow, NewsletterSettings settings)
+    {
+        var localNow = CherryBoxTimeZone.ToConfiguredLocalTime(utcNow, _config.Current.TimeZoneId);
+        return string.Equals(localNow.DayOfWeek.ToString(), NormalizeDay(settings.WeeklyDay), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasBothVoiceVersions(WeeklyDigestCache cache) =>
+        cache.Versions.ContainsKey(NewsletterNarratorVoice.Male.ToString())
+        && cache.Versions.ContainsKey(NewsletterNarratorVoice.Female.ToString());
+
+    private async Task<string?> ResolveEmailAsync(User user, CancellationToken cancellationToken)
     {
         var email = await _emailService.GetUserEmailAsync(user.Id, cancellationToken);
         if (!string.IsNullOrWhiteSpace(email))

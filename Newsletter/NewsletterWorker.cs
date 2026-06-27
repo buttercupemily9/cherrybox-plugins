@@ -29,10 +29,20 @@ internal sealed class NewsletterWorker
                 {
                     _logger.LogDebug("Newsletter service is not available; skipping weekly check.");
                 }
-                else if (ShouldSendWeeklyDigest(newsletter, DateTimeOffset.UtcNow))
+                else
                 {
-                    _logger.LogInformation("Weekly newsletter schedule matched; sending digest.");
-                    await newsletter.SendWeeklyDigestAsync(cancellationToken);
+                    var utcNow = DateTimeOffset.UtcNow;
+                    if (ShouldPrepareWeeklyDigest(newsletter, utcNow))
+                    {
+                        _logger.LogInformation("Weekly newsletter send day; pre-generating male and female digest versions.");
+                        await InvokePrepareWeeklyDigestAsync(newsletter, cancellationToken);
+                    }
+
+                    if (ShouldSendWeeklyDigest(newsletter, utcNow))
+                    {
+                        _logger.LogInformation("Weekly newsletter schedule matched; sending digest.");
+                        await newsletter.SendWeeklyDigestAsync(cancellationToken);
+                    }
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -51,21 +61,46 @@ internal sealed class NewsletterWorker
         }
     }
 
-    private static bool ShouldSendWeeklyDigest(INewsletterService newsletter, DateTimeOffset utcNow)
+    private static bool ShouldSendWeeklyDigest(INewsletterService newsletter, DateTimeOffset utcNow) =>
+        InvokeBoolMethod(newsletter, "ShouldSendWeeklyDigestNow", utcNow)
+        || InvokeBoolMethod(newsletter, "ShouldSendWeeklyNow", utcNow);
+
+    private static bool ShouldPrepareWeeklyDigest(INewsletterService newsletter, DateTimeOffset utcNow) =>
+        InvokeBoolMethod(newsletter, "ShouldPrepareWeeklyDigestNow", utcNow);
+
+    private static async Task InvokePrepareWeeklyDigestAsync(INewsletterService newsletter, CancellationToken cancellationToken)
     {
         var type = newsletter.GetType();
         var method = type.GetMethod(
-                "ShouldSendWeeklyDigestNow",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            ?? type.GetMethod(
-                "ShouldSendWeeklyNow",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            "PrepareWeeklyDigestAsync",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (method is null)
+            return;
+
+        try
+        {
+            var task = (Task)method.Invoke(newsletter, [cancellationToken])!;
+            await task;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Failed to prepare weekly digest cache.", ex);
+        }
+    }
+
+    private static bool InvokeBoolMethod(INewsletterService newsletter, string methodName, DateTimeOffset? utcNow = null)
+    {
+        var type = newsletter.GetType();
+        var method = type.GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         if (method is null || method.ReturnType != typeof(bool))
             return false;
 
         try
         {
-            return method.Invoke(newsletter, [utcNow]) is true;
+            var args = utcNow.HasValue ? new object[] { utcNow.Value } : Array.Empty<object>();
+            return method.Invoke(newsletter, args) is true;
         }
         catch
         {

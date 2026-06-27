@@ -1,0 +1,10 @@
+{
+  "id": "story-covers",
+  "name": "Story covers",
+  "version": "1.0.0",
+  "entryAssembly": "StoryCovers.Plugin.dll",
+  "entryType": "CherryBox.StoryCovers.Plugin.StoryCoversPlugin",
+  "settingsTabs": [
+    { "id": "story-covers", "label": "Story covers", "icon": "picture", "page": "settings.html", "order": 84 }
+  ]
+}

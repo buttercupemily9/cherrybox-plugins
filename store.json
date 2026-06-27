@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 20,
+  "catalogVersion": 21,
   "plugins": [
     {
       "id": "backup",
@@ -65,8 +65,8 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.3.0",
-      "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user.",
+      "version": "1.4.0",
+      "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user. Narrator voice matches reader gender and orientation.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
@@ -137,13 +137,25 @@
       "id": "ai",
       "folder": "Ai",
       "name": "AI",
-      "version": "1.1.0",
-      "description": "Shared Venice API credentials, chat model, and text-to-speech defaults for CherryBox plugins.",
+      "version": "1.2.0",
+      "description": "Shared Venice API credentials, chat model, image model, and text-to-speech defaults for CherryBox plugins.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Ai",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
       "screenshotUrls": [],
-      "changelog": "Add Venice chat model for AI-written newsletter intros and other plugins."
+      "changelog": "Add Venice image generation for story cover artwork."
+    },
+    {
+      "id": "story-covers",
+      "folder": "StoryCovers",
+      "name": "Story covers",
+      "version": "1.0.0",
+      "description": "Generate AI book-cover artwork for stories from story text, with title and author on the cover. Copies artwork to linked audio.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryCovers",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial release with background queue, auto-generate on index, and linked audio cover sync."
     },
     {
       "id": "story-tts",

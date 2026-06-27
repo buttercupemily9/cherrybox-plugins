@@ -2,17 +2,23 @@ using CherryBox.Plugins.Abstractions;
 
 namespace CherryBox.Ai.Plugin;
 
-internal sealed class AiService : IAiService
+internal sealed class AiService : IAiService, IAiImageService
 {
     private readonly AiSettingsStore _settings;
     private readonly VeniceTtsClient _venice;
     private readonly VeniceChatClient _chat;
+    private readonly VeniceImageClient _images;
 
-    public AiService(AiSettingsStore settings, VeniceTtsClient venice, VeniceChatClient chat)
+    public AiService(
+        AiSettingsStore settings,
+        VeniceTtsClient venice,
+        VeniceChatClient chat,
+        VeniceImageClient images)
     {
         _settings = settings;
         _venice = venice;
         _chat = chat;
+        _images = images;
     }
 
     public Task<AiSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default) =>
@@ -29,6 +35,7 @@ internal sealed class AiService : IAiService
 
             settings.Model = string.IsNullOrWhiteSpace(request.Model) ? "tts-kokoro" : request.Model.Trim();
             settings.ChatModel = string.IsNullOrWhiteSpace(request.ChatModel) ? "venice-uncensored" : request.ChatModel.Trim();
+            settings.ImageModel = string.IsNullOrWhiteSpace(request.ImageModel) ? "venice-sd35" : request.ImageModel.Trim();
             settings.Voice = string.IsNullOrWhiteSpace(request.Voice) ? "af_sky" : request.Voice.Trim();
             settings.ResponseFormat = string.IsNullOrWhiteSpace(request.ResponseFormat) ? "mp3" : request.ResponseFormat.Trim();
             settings.Speed = Math.Clamp(request.Speed, 0.25, 4.0);
@@ -85,10 +92,33 @@ internal sealed class AiService : IAiService
             cancellationToken);
     }
 
+    public async Task<AiImageResult> GenerateImageAsync(AiImageRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.Prompt))
+            throw new InvalidOperationException("An image prompt is required.");
+
+        var settings = _settings.Get();
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+            throw new InvalidOperationException("Venice API key is not configured.");
+
+        var model = string.IsNullOrWhiteSpace(request.Model) ? settings.ImageModel : request.Model.Trim();
+        var (data, mimeType) = await _images.GenerateAsync(
+            settings.ApiKey,
+            model,
+            request.Prompt,
+            request.Width,
+            request.Height,
+            request.Format,
+            cancellationToken);
+
+        return new AiImageResult(data, mimeType);
+    }
+
     private static AiSettingsDto ToDto(AiSettings settings) => new(
         !string.IsNullOrWhiteSpace(settings.ApiKey),
         settings.Model,
         settings.ChatModel,
+        settings.ImageModel,
         settings.Voice,
         settings.ResponseFormat,
         settings.Speed,
