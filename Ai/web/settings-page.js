@@ -25,8 +25,7 @@
   document.getElementById('settings-form').onsubmit = async function (e) {
     e.preventDefault();
     try {
-      await api.updateSettings({
-        apiKey: document.getElementById('apiKey').value || null,
+      var payload = {
         clearApiKey: document.getElementById('clearApiKey').checked,
         model: document.getElementById('model').value,
         chatModel: document.getElementById('chatModel').value,
@@ -35,7 +34,10 @@
         responseFormat: document.getElementById('responseFormat').value,
         speed: Number(document.getElementById('speed').value),
         maxCharsPerRequest: Number(document.getElementById('maxChars').value)
-      });
+      };
+      var apiKey = document.getElementById('apiKey').value.trim();
+      if (apiKey) payload.apiKey = apiKey;
+      await api.updateSettings(payload);
       document.getElementById('apiKey').value = '';
       document.getElementById('clearApiKey').checked = false;
       showMessage('Settings saved.', 'success');

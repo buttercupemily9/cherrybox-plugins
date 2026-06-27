@@ -15,7 +15,7 @@ public sealed class SocialPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
-        var store = new SocialStore(context.DataDirectory);
+        var store = new SocialStore(context);
         registry.RegisterSingleton(store);
         registry.RegisterScoped<ISocialService>(sp => new SocialService(
             sp.GetRequiredService<CherryBoxDbContext>(),

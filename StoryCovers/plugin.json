@@ -1,7 +1,7 @@
 {
   "id": "story-covers",
   "name": "Story covers",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "entryAssembly": "StoryCovers.Plugin.dll",
   "entryType": "CherryBox.StoryCovers.Plugin.StoryCoversPlugin",
   "settingsTabs": [

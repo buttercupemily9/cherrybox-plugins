@@ -19,9 +19,8 @@ public sealed class StoryTtsPlugin : ICherryBoxPlugin, IPluginServiceContributor
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
         var services = context.Services;
-        var dataDirectory = context.DataDirectory;
-        var settingsStore = new StoryTtsSettingsStore(dataDirectory);
-        var jobStore = new StoryTtsJobStore(dataDirectory);
+        var settingsStore = new StoryTtsSettingsStore(context);
+        var jobStore = new StoryTtsJobStore(context);
         var workerState = new StoryTtsWorkerState();
         workerState.SetEnabled(settingsStore.Get().BackgroundWorkerEnabled);
 

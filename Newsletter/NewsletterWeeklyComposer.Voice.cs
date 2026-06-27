@@ -50,12 +50,17 @@ public static partial class NewsletterWeeklyComposer
             ?? (audienceGender.HasValue && audienceOrientation.HasValue
                 ? NewsletterVoiceSelector.Resolve(audienceGender, audienceOrientation)
                 : NewsletterNarratorVoice.Female);
+        var audience = audienceGender ?? UserGender.Female;
+        var orientation = audienceOrientation ?? SexualOrientation.Straight;
+        var variant = NewsletterAiVariant.ResolveForUser(voice, audience, orientation);
         var aiIntro = await TryGenerateAiIntroAsync(
             plugins,
             services,
             username,
             items,
-            voice,
+            variant.Voice,
+            variant.Audience,
+            variant.Orientation,
             logger,
             cancellationToken);
         return RenderForUser(username, skinId, baseUrl, items, embeddedImages, voice, aiIntro);
@@ -83,6 +88,8 @@ public static partial class NewsletterWeeklyComposer
         string username,
         IReadOnlyList<NewsletterDigestItem> items,
         NewsletterNarratorVoice voice,
+        UserGender audience,
+        SexualOrientation orientation,
         ILogger? logger,
         CancellationToken cancellationToken)
     {
@@ -96,16 +103,16 @@ public static partial class NewsletterWeeklyComposer
             if (!settings.HasApiKey)
                 return null;
 
-            var prompt = NewsletterAiPrompts.BuildUserPrompt(username, items);
+            var prompt = NewsletterAiPrompts.BuildUserPrompt(username, items, audience, orientation);
             var text = await ai.CompleteChatAsync(
-                new AiChatRequest(prompt, NewsletterAiPrompts.SystemPromptFor(voice), MaxTokens: 850),
+                new AiChatRequest(prompt, NewsletterAiPrompts.SystemPromptFor(voice, audience, orientation), MaxTokens: 850),
                 cancellationToken);
 
             return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "AI newsletter intro generation failed for {Voice} voice; using default copy.", voice);
+            logger?.LogWarning(ex, "AI newsletter intro generation failed for {Voice}/{Audience}/{Orientation}; using default copy.", voice, audience, orientation);
             return null;
         }
     }

@@ -22,10 +22,9 @@ internal sealed class StoryTtsSettingsStore
     private readonly object _lock = new();
     private StoryTtsSettings _settings;
 
-    public StoryTtsSettingsStore(string dataDirectory)
+    public StoryTtsSettingsStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _path = Path.Combine(dataDirectory, "settings.json");
+        _path = context.GetConfigFilePath("settings.json");
         _settings = Load();
     }
 

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace CherryBox.Email.Plugin;
 
-public sealed class EmailPlugin : ICherryBoxPlugin, IPluginServiceContributor
+public sealed class EmailPlugin : ICherryBoxPlugin, IPluginServiceContributor, IPluginSchemaContributor
 {
     private UserEmailStore? _emailStore;
     private EmailSettingsStore? _settingsStore;
@@ -20,9 +20,9 @@ public sealed class EmailPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
-        _pluginDirectory = context.DataDirectory;
-        _settingsStore = new EmailSettingsStore(context.DataDirectory);
-        _emailStore = new UserEmailStore(context.DataDirectory);
+        _pluginDirectory = context.InstallDirectory;
+        _settingsStore = new EmailSettingsStore(context);
+        _emailStore = new UserEmailStore(context);
         var emailSender = new SmtpEmailSender();
 
         registry.RegisterSingleton(_settingsStore);
@@ -37,7 +37,7 @@ public sealed class EmailPlugin : ICherryBoxPlugin, IPluginServiceContributor
             return;
 
         LegacyEmailMigration.TryImportSmtpFromPasswordReset(_pluginDirectory, _settingsStore);
-        LegacyEmailMigration.TryImportUserEmailsDb(_pluginDirectory, _emailStore);
+        LegacyEmailMigration.TryImportUserEmailsDb(_pluginDirectory, context, _emailStore);
 
         await using var scope = context.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CherryBoxDbContext>();
@@ -47,4 +47,6 @@ public sealed class EmailPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public Task StopAsync(CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
+
+    public IReadOnlyList<PluginDatabaseSchema> GetDatabaseSchemas() => [UserEmailDatabase.Schema];
 }

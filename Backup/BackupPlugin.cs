@@ -10,7 +10,7 @@ public sealed class BackupPlugin : ICherryBoxPlugin
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(Path.Combine(context.DataDirectory, "backups"));
+        Directory.CreateDirectory(context.Storage.GetConfigSubdirectory("backups"));
         return Task.CompletedTask;
     }
 }

@@ -46,4 +46,14 @@ public interface IAiService
     Task<AiTestResult> TestConnectionAsync(AiTestRequest request, CancellationToken cancellationToken = default);
     Task<byte[]> SynthesizeSpeechAsync(string text, CancellationToken cancellationToken = default);
     Task<string> CompleteChatAsync(AiChatRequest request, CancellationToken cancellationToken = default);
+    Task<AiImageResult> GenerateImageAsync(AiImageRequest request, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Legacy compatibility surface for plugins compiled against older abstractions.
+/// Prefer <see cref="IAiService.GenerateImageAsync"/>.
+/// </summary>
+public interface IAiImageService
+{
+    Task<AiImageResult> GenerateImageAsync(AiImageRequest request, CancellationToken cancellationToken = default);
 }

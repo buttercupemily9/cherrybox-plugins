@@ -1,17 +1,42 @@
+using CherryBox.Plugins.Abstractions;
 using Microsoft.Data.Sqlite;
 
 namespace CherryBox.Achievements.Plugin;
+
+internal static class AchievementDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "achievements",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS user_stats (
+                    user_id TEXT NOT NULL PRIMARY KEY,
+                    plays INTEGER NOT NULL DEFAULT 0,
+                    story_views INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS user_achievements (
+                    user_id TEXT NOT NULL,
+                    achievement_id TEXT NOT NULL,
+                    unlocked_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, achievement_id)
+                );
+                """)
+        ]);
+}
 
 public sealed class AchievementStore
 {
     private readonly string _connectionString;
 
-    public AchievementStore(string dataDirectory)
+    public AchievementStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        var dbPath = Path.Combine(dataDirectory, "achievements.db");
+        var dbPath = context.GetDatabasePath("achievements");
+        PluginDatabaseMigrator.Ensure(dbPath, AchievementDatabase.Schema);
         _connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ConnectionString;
-        EnsureSchema();
     }
 
     public async Task<(int Plays, int StoryViews)> GetCountersAsync(Guid userId, CancellationToken cancellationToken)
@@ -98,28 +123,6 @@ public sealed class AchievementStore
         command.Parameters.AddWithValue("$achievementId", achievementId);
         command.Parameters.AddWithValue("$unlockedAt", unlockedAt.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    private void EnsureSchema()
-    {
-        using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            CREATE TABLE IF NOT EXISTS user_stats (
-                user_id TEXT NOT NULL PRIMARY KEY,
-                plays INTEGER NOT NULL DEFAULT 0,
-                story_views INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS user_achievements (
-                user_id TEXT NOT NULL,
-                achievement_id TEXT NOT NULL,
-                unlocked_at TEXT NOT NULL,
-                PRIMARY KEY (user_id, achievement_id)
-            );
-            """;
-        command.ExecuteNonQuery();
     }
 
     private SqliteConnection Open()

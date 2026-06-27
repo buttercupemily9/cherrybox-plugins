@@ -4,23 +4,23 @@ using Microsoft.Extensions.Logging;
 
 namespace CherryBox.Newsletter.Plugin;
 
-public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContributor
+public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContributor, IPluginSchemaContributor
 {
     private Task? _workerTask;
     private CancellationTokenSource? _workerCts;
 
     public string Id => "newsletter";
     public string Name => "Newsletter";
-    public string Version => "1.5.0";
+    public string Version => "1.5.2";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
-        var settingsStore = new NewsletterSettingsStore(context.DataDirectory);
-        var subscriptionStore = new NewsletterSubscriptionStore(context.DataDirectory);
-        var cacheStore = new NewsletterWeeklyCacheStore(context.DataDirectory);
+        var settingsStore = new NewsletterSettingsStore(context);
+        var subscriptionStore = new NewsletterSubscriptionStore(context);
+        var cacheStore = new NewsletterWeeklyCacheStore(context);
 
         registry.RegisterSingleton(settingsStore);
         registry.RegisterSingleton(subscriptionStore);
@@ -78,4 +78,6 @@ public sealed class NewsletterPlugin : ICherryBoxPlugin, IPluginServiceContribut
         _workerCts = null;
         _workerTask = null;
     }
+
+    public IReadOnlyList<PluginDatabaseSchema> GetDatabaseSchemas() => [NewsletterSubscriptionDatabase.Schema];
 }

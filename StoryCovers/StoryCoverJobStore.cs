@@ -3,17 +3,41 @@ using Microsoft.Data.Sqlite;
 
 namespace CherryBox.StoryCovers.Plugin;
 
+internal static class StoryCoverJobDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "story-cover-jobs",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS StoryCoverJobs (
+                    Id TEXT PRIMARY KEY,
+                    StoryMediaItemId TEXT NOT NULL,
+                    Status TEXT NOT NULL,
+                    StoryTitle TEXT,
+                    ErrorMessage TEXT,
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL,
+                    CompletedAt TEXT
+                );
+                CREATE INDEX IF NOT EXISTS IX_StoryCoverJobs_Story ON StoryCoverJobs(StoryMediaItemId);
+                CREATE INDEX IF NOT EXISTS IX_StoryCoverJobs_Status ON StoryCoverJobs(Status);
+                """)
+        ]);
+}
+
 internal sealed class StoryCoverJobStore
 {
     private readonly string _connectionString;
     private readonly object _lock = new();
 
-    public StoryCoverJobStore(string dataDirectory)
+    public StoryCoverJobStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        var dbPath = Path.Combine(dataDirectory, "story-cover-jobs.db");
+        var dbPath = context.GetDatabasePath("story-cover-jobs");
+        PluginDatabaseMigrator.Ensure(dbPath, StoryCoverJobDatabase.Schema);
         _connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ConnectionString;
-        EnsureSchema();
     }
 
     public StoryCoverJobDto Add(Guid storyMediaItemId, string? storyTitle)
@@ -207,26 +231,5 @@ internal sealed class StoryCoverJobStore
         var conn = new SqliteConnection(_connectionString);
         conn.Open();
         return conn;
-    }
-
-    private void EnsureSchema()
-    {
-        using var conn = Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            CREATE TABLE IF NOT EXISTS StoryCoverJobs (
-                Id TEXT PRIMARY KEY,
-                StoryMediaItemId TEXT NOT NULL,
-                Status TEXT NOT NULL,
-                StoryTitle TEXT,
-                ErrorMessage TEXT,
-                CreatedAt TEXT NOT NULL,
-                UpdatedAt TEXT NOT NULL,
-                CompletedAt TEXT
-            );
-            CREATE INDEX IF NOT EXISTS IX_StoryCoverJobs_Story ON StoryCoverJobs(StoryMediaItemId);
-            CREATE INDEX IF NOT EXISTS IX_StoryCoverJobs_Status ON StoryCoverJobs(Status);
-            """;
-        cmd.ExecuteNonQuery();
     }
 }

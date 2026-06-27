@@ -3,17 +3,46 @@ using Microsoft.Data.Sqlite;
 
 namespace CherryBox.StoryTts.Plugin;
 
+internal static class StoryTtsJobDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "story-tts-jobs",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS StoryTtsJobs (
+                    Id TEXT PRIMARY KEY,
+                    StoryMediaItemId TEXT NOT NULL,
+                    Status TEXT NOT NULL,
+                    StoryTitle TEXT NULL,
+                    OutputPath TEXT NULL,
+                    AudioMediaItemId TEXT NULL,
+                    ErrorMessage TEXT NULL,
+                    ChunksTotal INTEGER NOT NULL DEFAULT 0,
+                    ChunksCompleted INTEGER NOT NULL DEFAULT 0,
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL,
+                    StartedAt TEXT NULL,
+                    CompletedAt TEXT NULL
+                );
+                CREATE INDEX IF NOT EXISTS IX_StoryTtsJobs_Story ON StoryTtsJobs(StoryMediaItemId);
+                CREATE INDEX IF NOT EXISTS IX_StoryTtsJobs_Status ON StoryTtsJobs(Status);
+                """)
+        ]);
+}
+
 internal sealed class StoryTtsJobStore
 {
     private readonly string _connectionString;
     private readonly object _lock = new();
 
-    public StoryTtsJobStore(string dataDirectory)
+    public StoryTtsJobStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        var dbPath = Path.Combine(dataDirectory, "story-tts-jobs.db");
+        var dbPath = context.GetDatabasePath("story-tts-jobs");
+        PluginDatabaseMigrator.Ensure(dbPath, StoryTtsJobDatabase.Schema);
         _connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ConnectionString;
-        EnsureSchema();
     }
 
     public StoryTtsJobDto Add(Guid storyMediaItemId, string? storyTitle)
@@ -236,31 +265,5 @@ internal sealed class StoryTtsJobStore
         var conn = new SqliteConnection(_connectionString);
         conn.Open();
         return conn;
-    }
-
-    private void EnsureSchema()
-    {
-        using var conn = Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            CREATE TABLE IF NOT EXISTS StoryTtsJobs (
-                Id TEXT PRIMARY KEY,
-                StoryMediaItemId TEXT NOT NULL,
-                Status TEXT NOT NULL,
-                StoryTitle TEXT NULL,
-                OutputPath TEXT NULL,
-                AudioMediaItemId TEXT NULL,
-                ErrorMessage TEXT NULL,
-                ChunksTotal INTEGER NOT NULL DEFAULT 0,
-                ChunksCompleted INTEGER NOT NULL DEFAULT 0,
-                CreatedAt TEXT NOT NULL,
-                UpdatedAt TEXT NOT NULL,
-                StartedAt TEXT NULL,
-                CompletedAt TEXT NULL
-            );
-            CREATE INDEX IF NOT EXISTS IX_StoryTtsJobs_Story ON StoryTtsJobs(StoryMediaItemId);
-            CREATE INDEX IF NOT EXISTS IX_StoryTtsJobs_Status ON StoryTtsJobs(Status);
-            """;
-        cmd.ExecuteNonQuery();
     }
 }

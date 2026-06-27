@@ -2,7 +2,7 @@ using CherryBox.Plugins.Abstractions;
 
 namespace CherryBox.Ai.Plugin;
 
-internal sealed class AiService : IAiService
+internal sealed class AiService : IAiService, IAiImageService
 {
     private readonly AiSettingsStore _settings;
     private readonly VeniceTtsClient _venice;
@@ -26,12 +26,19 @@ internal sealed class AiService : IAiService
 
     public Task<AiSettingsDto> UpdateSettingsAsync(UpdateAiSettingsRequest request, CancellationToken cancellationToken = default)
     {
+        if (request is null)
+            throw new InvalidOperationException("Request body is required.");
+
         var updated = _settings.Update(settings =>
         {
             if (request.ClearApiKey)
+            {
                 settings.ApiKey = null;
+            }
             else if (!string.IsNullOrWhiteSpace(request.ApiKey))
+            {
                 settings.ApiKey = request.ApiKey.Trim();
+            }
 
             settings.Model = string.IsNullOrWhiteSpace(request.Model) ? "tts-kokoro" : request.Model.Trim();
             settings.ChatModel = string.IsNullOrWhiteSpace(request.ChatModel) ? "venice-uncensored" : request.ChatModel.Trim();

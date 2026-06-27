@@ -18,10 +18,9 @@ internal sealed class TranscodeProfileStore
     private readonly object _lock = new();
     private List<TranscodeProfileDto> _cache = new();
 
-    public TranscodeProfileStore(string dataDirectory)
+    public TranscodeProfileStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _profilesPath = Path.Combine(dataDirectory, "profiles.json");
+        _profilesPath = context.GetConfigFilePath("profiles.json");
         Load();
     }
 
@@ -162,10 +161,9 @@ internal sealed class TranscodeAssignmentsStore
     private readonly object _lock = new();
     private TranscodeAssignmentsDto _assignments;
 
-    public TranscodeAssignmentsStore(string dataDirectory)
+    public TranscodeAssignmentsStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _path = Path.Combine(dataDirectory, "assignments.json");
+        _path = context.GetConfigFilePath("assignments.json");
         _assignments = Load();
     }
 

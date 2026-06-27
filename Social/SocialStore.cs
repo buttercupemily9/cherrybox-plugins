@@ -1,17 +1,82 @@
+using CherryBox.Plugins.Abstractions;
 using Microsoft.Data.Sqlite;
 
 namespace CherryBox.Social.Plugin;
+
+internal static class SocialDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "social",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS user_profiles (
+                    user_id TEXT NOT NULL PRIMARY KEY,
+                    bio_markdown TEXT NOT NULL DEFAULT '',
+                    likes_public INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS media_votes (
+                    user_id TEXT NOT NULL,
+                    media_id TEXT NOT NULL,
+                    vote INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, media_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS media_comments (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    media_id TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_media_comments_media ON media_comments(media_id);
+
+                CREATE TABLE IF NOT EXISTS profile_comments (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    author_user_id TEXT NOT NULL,
+                    target_user_id TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_profile_comments_target ON profile_comments(target_user_id);
+
+                CREATE TABLE IF NOT EXISTS friendships (
+                    requester_id TEXT NOT NULL,
+                    addressee_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (requester_id, addressee_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS messages (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    from_user_id TEXT NOT NULL,
+                    to_user_id TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    read_at TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_messages_to_user ON messages(to_user_id, read_at);
+                """)
+        ]);
+}
 
 public sealed class SocialStore
 {
     private readonly string _connectionString;
 
-    public SocialStore(string dataDirectory)
+    public SocialStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        var dbPath = Path.Combine(dataDirectory, "social.db");
+        var dbPath = context.GetDatabasePath("social");
+        PluginDatabaseMigrator.Ensure(dbPath, SocialDatabase.Schema);
         _connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ConnectionString;
-        EnsureSchema();
     }
 
     public async Task<(string BioMarkdown, bool LikesPublic)> GetProfileAsync(Guid userId, CancellationToken cancellationToken)
@@ -432,68 +497,6 @@ public sealed class SocialStore
         }
 
         return rows;
-    }
-
-    private void EnsureSchema()
-    {
-        using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            CREATE TABLE IF NOT EXISTS user_profiles (
-                user_id TEXT NOT NULL PRIMARY KEY,
-                bio_markdown TEXT NOT NULL DEFAULT '',
-                likes_public INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS media_votes (
-                user_id TEXT NOT NULL,
-                media_id TEXT NOT NULL,
-                vote INTEGER NOT NULL,
-                updated_at TEXT NOT NULL,
-                PRIMARY KEY (user_id, media_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS media_comments (
-                id TEXT NOT NULL PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                media_id TEXT NOT NULL,
-                body TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_media_comments_media ON media_comments(media_id);
-
-            CREATE TABLE IF NOT EXISTS profile_comments (
-                id TEXT NOT NULL PRIMARY KEY,
-                author_user_id TEXT NOT NULL,
-                target_user_id TEXT NOT NULL,
-                body TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_profile_comments_target ON profile_comments(target_user_id);
-
-            CREATE TABLE IF NOT EXISTS friendships (
-                requester_id TEXT NOT NULL,
-                addressee_id TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                PRIMARY KEY (requester_id, addressee_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS messages (
-                id TEXT NOT NULL PRIMARY KEY,
-                from_user_id TEXT NOT NULL,
-                to_user_id TEXT NOT NULL,
-                body TEXT NOT NULL,
-                read_at TEXT,
-                created_at TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_messages_to_user ON messages(to_user_id, read_at);
-            """;
-        command.ExecuteNonQuery();
     }
 
     private SqliteConnection Open()

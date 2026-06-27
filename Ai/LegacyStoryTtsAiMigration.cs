@@ -10,19 +10,37 @@ internal static class LegacyStoryTtsAiMigration
         PropertyNameCaseInsensitive = true
     };
 
-    public static void TryImportFromStoryTts(string aiDataDirectory, AiSettingsStore store)
+    public static void TryImportFromStoryTts(string aiInstallDirectory, AiSettingsStore store)
     {
         if (store.HasApiKey)
             return;
 
-        var parent = Directory.GetParent(aiDataDirectory)?.FullName;
-        if (parent is null)
-            return;
+        foreach (var legacyPath in ResolveStoryTtsSettingsPaths(aiInstallDirectory))
+        {
+            if (!File.Exists(legacyPath))
+                continue;
 
-        var legacyPath = Path.Combine(parent, "story-tts", "settings.json");
-        if (!File.Exists(legacyPath))
-            return;
+            if (TryImportFromSettingsFile(legacyPath, store))
+                return;
+        }
+    }
 
+    private static IEnumerable<string> ResolveStoryTtsSettingsPaths(string aiInstallDirectory)
+    {
+        var pluginsRoot = Directory.GetParent(aiInstallDirectory)?.FullName;
+        if (pluginsRoot is not null)
+            yield return Path.Combine(pluginsRoot, "story-tts", "settings.json");
+
+        var programDataRoot = Directory.GetParent(pluginsRoot ?? string.Empty)?.FullName;
+        if (programDataRoot is null)
+            yield break;
+
+        yield return Path.Combine(programDataRoot, "config", "story-tts-settings.json");
+        yield return Path.Combine(programDataRoot, "config", "story-tts", "settings.json");
+    }
+
+    private static bool TryImportFromSettingsFile(string legacyPath, AiSettingsStore store)
+    {
         LegacyStoryTtsSettings? legacy;
         try
         {
@@ -30,11 +48,11 @@ internal static class LegacyStoryTtsAiMigration
         }
         catch
         {
-            return;
+            return false;
         }
 
         if (legacy is null || string.IsNullOrWhiteSpace(legacy.ApiKey))
-            return;
+            return false;
 
         store.Update(settings =>
         {
@@ -50,6 +68,7 @@ internal static class LegacyStoryTtsAiMigration
             if (legacy.MaxCharsPerRequest > 0)
                 settings.MaxCharsPerRequest = legacy.MaxCharsPerRequest;
         });
+        return true;
     }
 
     private sealed class LegacyStoryTtsSettings

@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 27,
+  "catalogVersion": 29,
   "plugins": [
     {
       "id": "achievements",
@@ -17,13 +17,13 @@
       "id": "ai",
       "folder": "Ai",
       "name": "AI",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "description": "Shared Venice API credentials, chat model, image model, and text-to-speech defaults for CherryBox plugins.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Ai",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
       "screenshotUrls": [],
-      "changelog": "Drop IAiImageService interface reference so plugins load on hosts without that shared type."
+      "changelog": "Restore IAiImageService compatibility shim; image generation on IAiService."
     },
     {
       "id": "backup",
@@ -113,13 +113,13 @@
       "id": "story-covers",
       "folder": "StoryCovers",
       "name": "Story covers",
-      "version": "1.0.1",
+      "version": "1.0.3",
       "description": "Generate AI book-cover artwork for stories from story text, with title and author on the cover. Copies artwork to linked audio.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StoryCovers",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
       "screenshotUrls": [],
-      "changelog": "Resolve AI image generation via reflection for compatibility with older host abstractions."
+      "changelog": "Invoke AI image generation via reflection so Story covers loads without IAiImageService on the host."
     },
     {
       "id": "story-sites",

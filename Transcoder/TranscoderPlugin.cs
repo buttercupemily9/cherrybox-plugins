@@ -20,10 +20,9 @@ public sealed class TranscoderPlugin : ICherryBoxPlugin, IPluginServiceContribut
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
         var services = context.Services;
-        var dataDirectory = context.DataDirectory;
-        var profileStore = new TranscodeProfileStore(dataDirectory);
-        var assignmentsStore = new TranscodeAssignmentsStore(dataDirectory);
-        var jobStore = new TranscodeJobStore(dataDirectory);
+        var profileStore = new TranscodeProfileStore(context);
+        var assignmentsStore = new TranscodeAssignmentsStore(context);
+        var jobStore = new TranscodeJobStore(context);
         var workerState = new TranscodeWorkerState();
         workerState.SetEnabled(assignmentsStore.Get().BackgroundWorkerEnabled);
 
