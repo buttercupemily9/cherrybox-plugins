@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 21,
+  "catalogVersion": 23,
   "plugins": [
     {
       "id": "backup",
@@ -41,13 +41,13 @@
       "id": "email",
       "folder": "Email",
       "name": "Email",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Shared SMTP settings and email delivery for CherryBox plugins.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Email",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Add embedded inline image support for HTML emails (cid: linked resources)."
+      "changelog": "Per-send From display name override; inline cid: attachments with Content-Disposition inline."
     },
     {
       "id": "password-reset",
@@ -65,13 +65,13 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.4.0",
+      "version": "1.4.1",
       "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user. Narrator voice matches reader gender and orientation.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Embed item thumbnails and cover art inline in weekly digest emails."
+      "changelog": "Candy Cherry and Maxxx Cherry narrator personas with per-voice From name; fix inline email thumbnails."
     },
     {
       "id": "view-time",

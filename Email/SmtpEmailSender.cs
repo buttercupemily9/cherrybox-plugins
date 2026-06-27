@@ -14,6 +14,7 @@ internal sealed class SmtpEmailSender
         string? plainTextBody,
         string? htmlBody,
         IReadOnlyList<EmailEmbeddedImage>? embeddedImages,
+        string? fromDisplayName,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(settings.SmtpHost))
@@ -22,7 +23,10 @@ internal sealed class SmtpEmailSender
             throw new InvalidOperationException("From address is not configured.");
 
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(settings.FromDisplayName, settings.FromAddress));
+        var senderName = string.IsNullOrWhiteSpace(fromDisplayName)
+            ? settings.FromDisplayName
+            : fromDisplayName.Trim();
+        message.From.Add(new MailboxAddress(senderName, settings.FromAddress));
         message.To.Add(MailboxAddress.Parse(toAddress));
         message.Subject = subject;
 
@@ -44,8 +48,9 @@ internal sealed class SmtpEmailSender
                     var fileName = string.IsNullOrWhiteSpace(image.FileName)
                         ? $"{image.ContentId}.jpg"
                         : image.FileName;
-                    var linked = builder.LinkedResources.Add(fileName, image.Data, ContentType.Parse(image.MimeType));
+                    var linked = builder.LinkedResources.Add(fileName, image.Data, ParseImageContentType(image.MimeType));
                     linked.ContentId = image.ContentId;
+                    linked.ContentDisposition = new ContentDisposition(ContentDisposition.Inline);
                 }
             }
 
@@ -68,6 +73,21 @@ internal sealed class SmtpEmailSender
 
         await client.SendAsync(message, cancellationToken);
         await client.DisconnectAsync(true, cancellationToken);
+    }
+
+    private static ContentType ParseImageContentType(string mimeType)
+    {
+        if (string.IsNullOrWhiteSpace(mimeType))
+            return ContentType.Parse("image/jpeg");
+
+        try
+        {
+            return ContentType.Parse(mimeType.Trim());
+        }
+        catch (FormatException)
+        {
+            return ContentType.Parse("image/jpeg");
+        }
     }
 
     private static string StripHtml(string html) =>

@@ -10,6 +10,12 @@ public enum NewsletterNarratorVoice
 
 internal static class NewsletterVoiceSelector
 {
+    public const string FemaleDisplayName = "Candy Cherry";
+    public const string MaleDisplayName = "Maxxx Cherry";
+
+    public static string DisplayName(NewsletterNarratorVoice voice) =>
+        voice == NewsletterNarratorVoice.Male ? MaleDisplayName : FemaleDisplayName;
+
     /// <summary>
     /// Maps the reader's gender and orientation to the narrator voice used in the weekly digest.
     /// </summary>
@@ -39,7 +45,7 @@ internal static class NewsletterVoiceSelector
     }
 
     public static string Describe(NewsletterNarratorVoice voice) =>
-        voice == NewsletterNarratorVoice.Male ? "male" : "female";
+        voice == NewsletterNarratorVoice.Male ? MaleDisplayName : FemaleDisplayName;
 
     public static bool TryParseVoice(string? value, out NewsletterNarratorVoice voice)
     {

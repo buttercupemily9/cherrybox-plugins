@@ -35,7 +35,8 @@ public sealed record SendEmailRequest(
     string Subject,
     string? PlainTextBody = null,
     string? HtmlBody = null,
-    IReadOnlyList<EmailEmbeddedImage>? EmbeddedImages = null);
+    IReadOnlyList<EmailEmbeddedImage>? EmbeddedImages = null,
+    string? FromDisplayName = null);
 
 public sealed record SetUserEmailRequest(string? Email);
 

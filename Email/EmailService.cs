@@ -59,6 +59,7 @@ internal sealed class EmailService : IEmailService
             "This is a test email from the CherryBox email plugin.",
             null,
             null,
+            null,
             cancellationToken);
     }
 
@@ -83,6 +84,7 @@ internal sealed class EmailService : IEmailService
             request.PlainTextBody,
             request.HtmlBody,
             request.EmbeddedImages,
+            request.FromDisplayName,
             cancellationToken);
     }
 

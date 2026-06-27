@@ -156,12 +156,13 @@ internal sealed class NewsletterService : INewsletterService
                 if (!cache.Versions.TryGetValue(voice.ToString(), out var version))
                     version = cache.Versions[NewsletterNarratorVoice.Female.ToString()];
                 var aiIntro = version.AiIntro;
-                var (html, plain, _) = NewsletterWeeklyComposer.RenderForUser(
+                var (html, plain, _, narratorName) = NewsletterWeeklyComposer.RenderForUser(
                     user.Username,
                     user.SkinId,
                     baseUrl,
                     cache.Items,
                     embeddedImages,
+                    voice,
                     aiIntro);
 
                 await _emailService.SendAsync(new SendEmailRequest(
@@ -169,7 +170,8 @@ internal sealed class NewsletterService : INewsletterService
                     "Your CherryBox weekly update",
                     plain,
                     html,
-                    embeddedImages), cancellationToken);
+                    embeddedImages,
+                    narratorName), cancellationToken);
                 sentCount++;
             }
             catch (Exception ex)

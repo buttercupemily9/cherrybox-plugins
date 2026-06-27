@@ -7,7 +7,7 @@ namespace CherryBox.Newsletter.Plugin;
 
 public static partial class NewsletterWeeklyComposer
 {
-    public static async Task<(string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages)> BuildAsync(
+    public static async Task<(string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages, string NarratorDisplayName)> BuildAsync(
         CherryBox.Data.CherryBoxDbContext db,
         IPluginServiceRegistry plugins,
         IServiceProvider services,
@@ -31,7 +31,7 @@ public static partial class NewsletterWeeklyComposer
             voiceOverride: null,
             cancellationToken);
 
-    public static async Task<(string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages)> BuildForTestAsync(
+    public static async Task<(string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages, string NarratorDisplayName)> BuildForTestAsync(
         CherryBox.Data.CherryBoxDbContext db,
         IPluginServiceRegistry plugins,
         IServiceProvider services,
@@ -58,21 +58,23 @@ public static partial class NewsletterWeeklyComposer
             voice,
             logger,
             cancellationToken);
-        return RenderForUser(username, skinId, baseUrl, items, embeddedImages, aiIntro);
+        return RenderForUser(username, skinId, baseUrl, items, embeddedImages, voice, aiIntro);
     }
 
-    public static (string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages) RenderForUser(
+    public static (string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages, string NarratorDisplayName) RenderForUser(
         string username,
         string? skinId,
         string baseUrl,
         IReadOnlyList<NewsletterDigestItem> items,
         IReadOnlyList<EmailEmbeddedImage> embeddedImages,
+        NewsletterNarratorVoice voice,
         string? aiIntro)
     {
+        var narratorName = NewsletterVoiceSelector.DisplayName(voice);
         var theme = NewsletterTemplates.GetTheme(skinId);
-        var html = NewsletterTemplates.RenderWeeklyDigest(username, baseUrl, theme, items, aiIntro);
-        var plain = NewsletterTemplates.WeeklyPlainText(username, baseUrl, items, aiIntro);
-        return (html, plain, embeddedImages);
+        var html = NewsletterTemplates.RenderWeeklyDigest(username, baseUrl, theme, items, narratorName, aiIntro);
+        var plain = NewsletterTemplates.WeeklyPlainText(username, baseUrl, items, narratorName, aiIntro);
+        return (html, plain, embeddedImages, narratorName);
     }
 
     internal static async Task<string?> TryGenerateAiIntroAsync(
@@ -108,4 +110,4 @@ public static partial class NewsletterWeeklyComposer
         }
     }
 }
-
+
