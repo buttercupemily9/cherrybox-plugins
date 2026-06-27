@@ -1,3 +1,4 @@
+using CherryBox.Plugins.Abstractions;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -12,6 +13,7 @@ internal sealed class SmtpEmailSender
         string subject,
         string? plainTextBody,
         string? htmlBody,
+        IReadOnlyList<EmailEmbeddedImage>? embeddedImages,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(settings.SmtpHost))
@@ -31,6 +33,22 @@ internal sealed class SmtpEmailSender
                 HtmlBody = htmlBody,
                 TextBody = plainTextBody ?? StripHtml(htmlBody)
             };
+
+            if (embeddedImages is { Count: > 0 })
+            {
+                foreach (var image in embeddedImages)
+                {
+                    if (string.IsNullOrWhiteSpace(image.ContentId) || image.Data.Length == 0)
+                        continue;
+
+                    var fileName = string.IsNullOrWhiteSpace(image.FileName)
+                        ? $"{image.ContentId}.jpg"
+                        : image.FileName;
+                    var linked = builder.LinkedResources.Add(fileName, image.Data, ContentType.Parse(image.MimeType));
+                    linked.ContentId = image.ContentId;
+                }
+            }
+
             message.Body = builder.ToMessageBody();
         }
         else

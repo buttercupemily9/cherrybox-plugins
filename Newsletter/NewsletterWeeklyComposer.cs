@@ -11,7 +11,7 @@ public static class NewsletterWeeklyComposer
 {
     private const int DigestItemLimit = 12;
 
-    public static async Task<(string Html, string Plain)> BuildAsync(
+    public static async Task<(string Html, string Plain, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages)> BuildAsync(
         CherryBoxDbContext db,
         IPluginServiceRegistry plugins,
         IServiceProvider services,
@@ -22,15 +22,15 @@ public static class NewsletterWeeklyComposer
         ILogger? logger,
         CancellationToken cancellationToken)
     {
-        var items = await LoadDigestItemsAsync(db, baseUrl, since, cancellationToken);
+        var (items, embeddedImages) = await LoadDigestItemsAsync(db, baseUrl, since, cancellationToken);
         var aiIntro = await TryGenerateAiIntroAsync(plugins, services, username, items, logger, cancellationToken);
         var theme = NewsletterTemplates.GetTheme(skinId);
         var html = NewsletterTemplates.RenderWeeklyDigest(username, baseUrl, theme, items, aiIntro);
         var plain = NewsletterTemplates.WeeklyPlainText(username, baseUrl, items, aiIntro);
-        return (html, plain);
+        return (html, plain, embeddedImages);
     }
 
-    internal static async Task<IReadOnlyList<NewsletterDigestItem>> LoadDigestItemsAsync(
+    internal static async Task<(IReadOnlyList<NewsletterDigestItem> Items, IReadOnlyList<EmailEmbeddedImage> EmbeddedImages)> LoadDigestItemsAsync(
         CherryBoxDbContext db,
         string baseUrl,
         DateTimeOffset since,
@@ -47,7 +47,7 @@ public static class NewsletterWeeklyComposer
             .ToListAsync(cancellationToken);
 
         if (recentIds.Count == 0)
-            return [];
+            return ([], []);
 
         var media = await db.MediaItems.AsNoTracking()
             .Include(m => m.Studio)
@@ -60,7 +60,7 @@ public static class NewsletterWeeklyComposer
             .ToList();
 
         if (media.Count == 0)
-            return [];
+            return ([], []);
 
         var mediaIds = media.Select(m => m.Id).ToList();
 
@@ -84,18 +84,33 @@ public static class NewsletterWeeklyComposer
             .GroupBy(x => x.MediaItemId)
             .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(x => x.Name).Distinct().OrderBy(n => n)));
 
-        return media.Select(m => new NewsletterDigestItem(
-            string.IsNullOrWhiteSpace(m.Title) ? m.FileName : m.Title!,
-            FormatMediaType(m.MediaType),
-            BuildMediaUrl(baseUrl, m.Id, m.MediaType),
-            m.UpdatedAt,
-            string.IsNullOrWhiteSpace(m.Author) ? null : m.Author.Trim(),
-            m.Studio?.Name,
-            performersByMedia.GetValueOrDefault(m.Id),
-            tagsByMedia.GetValueOrDefault(m.Id),
-            TruncateDescription(m.Description),
-            FormatDuration(m.DurationSeconds),
-            string.IsNullOrWhiteSpace(m.SourceSite) ? null : m.SourceSite.Trim())).ToList();
+        var embeddedImages = await NewsletterImageEmbedder.BuildEmbeddedImagesAsync(
+            db,
+            media.Select(m => (m.Id, m.MediaType)).ToList(),
+            cancellationToken);
+
+        var items = media.Select(m =>
+        {
+            var contentId = embeddedImages.Any(e => e.ContentId == NewsletterImageEmbedder.ContentIdFor(m.Id))
+                ? NewsletterImageEmbedder.ContentIdFor(m.Id)
+                : null;
+
+            return new NewsletterDigestItem(
+                string.IsNullOrWhiteSpace(m.Title) ? m.FileName : m.Title!,
+                FormatMediaType(m.MediaType),
+                BuildMediaUrl(baseUrl, m.Id, m.MediaType),
+                m.UpdatedAt,
+                string.IsNullOrWhiteSpace(m.Author) ? null : m.Author.Trim(),
+                m.Studio?.Name,
+                performersByMedia.GetValueOrDefault(m.Id),
+                tagsByMedia.GetValueOrDefault(m.Id),
+                TruncateDescription(m.Description),
+                FormatDuration(m.DurationSeconds),
+                string.IsNullOrWhiteSpace(m.SourceSite) ? null : m.SourceSite.Trim(),
+                contentId);
+        }).ToList();
+
+        return (items, embeddedImages);
     }
 
     private static async Task<string?> TryGenerateAiIntroAsync(
