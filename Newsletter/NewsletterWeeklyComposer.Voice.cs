@@ -98,7 +98,7 @@ public static partial class NewsletterWeeklyComposer
 
             var prompt = NewsletterAiPrompts.BuildUserPrompt(username, items);
             var text = await ai.CompleteChatAsync(
-                new AiChatRequest(prompt, NewsletterAiPrompts.SystemPromptFor(voice), MaxTokens: 500),
+                new AiChatRequest(prompt, NewsletterAiPrompts.SystemPromptFor(voice), MaxTokens: 850),
                 cancellationToken);
 
             return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
