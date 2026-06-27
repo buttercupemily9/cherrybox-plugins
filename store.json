@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 26,
+  "catalogVersion": 27,
   "plugins": [
     {
       "id": "achievements",
@@ -77,13 +77,13 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.4.1",
-      "description": "Welcome emails on signup and optional weekly digests of new CherryBox items, skinned to each user. Narrator voice matches reader gender and orientation.",
+      "version": "1.5.0",
+      "description": "Welcome emails on signup and weekly digests with new items plus hand-picked recommendations. Candy Cherry and Maxxx Cherry write intimate AI intros using performers, studios, and tags.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Candy Cherry and Maxxx Cherry narrator personas with per-voice From name; fix inline email thumbnails."
+      "changelog": "Intimate friend/lover weekly copy with performer callouts, metadata-rich AI prompts, and a recommendations section."
     },
     {
       "id": "password-reset",
