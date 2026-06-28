@@ -131,12 +131,13 @@ public sealed class MotherlessImagesHandler : IImageDownloadHandler
     public string SiteName => "Motherless";
 
     public bool CanHandle(Uri url) =>
-        SiteHostMatcher.HostEndsWith(url, "motherless.com") &&
-        (url.AbsolutePath.Contains("/images", StringComparison.OrdinalIgnoreCase) ||
-         url.AbsolutePath.Contains("/gallery", StringComparison.OrdinalIgnoreCase));
+        MotherlessUrlHelper.IsSupportedHost(url) && MotherlessUrlHelper.IsContentPath(url);
 
-    public Task<ImageDownloadPlan?> BuildPlanAsync(string url, CancellationToken cancellationToken = default) =>
-        Task.FromResult<ImageDownloadPlan?>(YtDlpPlanHelper.BuildYtDlpPlan(url, SiteName));
+    public Task<ImageDownloadPlan?> BuildPlanAsync(string url, CancellationToken cancellationToken = default)
+    {
+        var canonicalUrl = MotherlessUrlHelper.ToCanonicalUrl(url);
+        return Task.FromResult<ImageDownloadPlan?>(YtDlpPlanHelper.BuildYtDlpPlan(canonicalUrl, SiteName));
+    }
 }
 
 public sealed class XhamsterPhotosHandler : IImageDownloadHandler

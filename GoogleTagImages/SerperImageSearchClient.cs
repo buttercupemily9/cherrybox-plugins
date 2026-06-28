@@ -16,7 +16,7 @@ internal sealed class SerperImageSearchClient
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://google.serper.dev/images");
         request.Headers.TryAddWithoutValidation("X-API-KEY", apiKey);
-        request.Content = JsonContent.Create(new { q = query, num = 10 });
+        request.Content = JsonContent.Create(new { q = query, num = 10, safe = "off" });
 
         using var response = await _http.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);

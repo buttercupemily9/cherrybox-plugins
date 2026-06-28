@@ -113,12 +113,13 @@ public static partial class NewsletterWeeklyComposer
             query = query.Where(m => !excludeIds.Contains(m.Id));
         }
 
+        // SQLite cannot translate DateTimeOffset in ORDER BY; rank by int columns in SQL, refine in memory.
         var candidates = await query
-            .OrderByDescending(m => m.ViewCount + m.PlayCount)
+            .OrderByDescending(m => m.ViewCount)
+            .ThenByDescending(m => m.PlayCount)
             .Take(RecommendationCandidatePool)
             .ToListAsync(cancellationToken);
 
-        // SQLite cannot translate DateTimeOffset in ORDER BY; refine ties in memory.
         candidates = candidates
             .OrderByDescending(m => m.ViewCount + m.PlayCount)
             .ThenByDescending(m => m.UpdatedAt)

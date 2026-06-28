@@ -56,9 +56,30 @@ public sealed class SexStoriesImporter : HtmlStorySiteImporterBase
     protected override bool MatchesHost(Uri url) => HtmlStoryExtractor.HostMatches(url, "sexstories.com");
     protected override StoryImportPageResult ParsePage(HtmlDocument doc, Uri url)
     {
-        var title = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText.Trim() ?? "SexStories story";
-        var author = doc.DocumentNode.SelectSingleNode("//a[contains(@href,'/author/')]")?.InnerText.Trim();
-        var text = HtmlStoryExtractor.ExtractText(doc, "//div[@id='story']", "//div[contains(@class,'storytext')]", "//article");
+        var heading = doc.DocumentNode.SelectSingleNode("//div[contains(@class,'story_info')]//h2");
+        string title;
+        string? author;
+
+        if (heading is not null)
+        {
+            heading.SelectSingleNode(".//span[contains(@class,'title_link')]")?.Remove();
+            title = HtmlEntity.DeEntitize(heading.InnerText).Trim();
+            author = doc.DocumentNode
+                .SelectSingleNode("//div[contains(@class,'story_info')]//a[contains(@href,'/profile')]")
+                ?.InnerText.Trim();
+        }
+        else
+        {
+            title = "SexStories story";
+            author = doc.DocumentNode.SelectSingleNode("//a[contains(@href,'/profile')]")?.InnerText.Trim();
+        }
+
+        var text = HtmlStoryExtractor.ExtractText(
+            doc,
+            "//div[@id='story_center_panel']//div[@class='block_panel']",
+            "//div[@id='story']",
+            "//div[contains(@class,'storytext')]",
+            "//article");
         var next = HtmlStoryExtractor.FindNextPage(doc, url);
         return new StoryImportPageResult(title, author, text, next);
     }

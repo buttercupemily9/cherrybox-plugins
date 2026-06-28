@@ -83,11 +83,14 @@ internal sealed class GoogleTagImageService : IGoogleTagImageService
         if (!IsConfigured(settings))
             return Array.Empty<string>();
 
-        var searchQuery = string.IsNullOrWhiteSpace(settings.SearchQuerySuffix)
-            ? query
-            : $"{query} {settings.SearchQuerySuffix}".Trim();
+        foreach (var searchQuery in TagImageSearchQueries.BuildQueries(query, settings.SearchQuerySuffix))
+        {
+            var urls = await SearchWithSettingsAsync(settings, searchQuery, cancellationToken);
+            if (urls.Count > 0)
+                return urls;
+        }
 
-        return await SearchWithSettingsAsync(settings, searchQuery, cancellationToken);
+        return Array.Empty<string>();
     }
 
     private Task<IReadOnlyList<string>> SearchWithSettingsAsync(
@@ -134,6 +137,7 @@ internal sealed class GoogleTagImageService : IGoogleTagImageService
     {
         var hasApiKey = !string.IsNullOrWhiteSpace(settings.ApiKey);
         return new GoogleTagImageSettingsDto(
+            ResolveProvider(settings),
             hasApiKey,
             IsConfigured(settings),
             settings.SearchEngineId,
