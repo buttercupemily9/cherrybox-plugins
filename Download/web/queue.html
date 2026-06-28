@@ -70,6 +70,10 @@
 
       <h2>Download history</h2>
 
+      <p class="actions">
+        <button type="button" class="secondary" id="clear-successful-history-btn">Clear successful downloads</button>
+      </p>
+
       <div id="history"></div>
 
     </div>
@@ -258,6 +262,42 @@
       });
 
 
+
+      document.getElementById('clear-successful-history-btn').addEventListener('click', function () {
+        var button = document.getElementById('clear-successful-history-btn');
+        var successfulCount = historyCache.filter(function (entry) {
+          return !entry.failed;
+        }).length;
+        if (!successfulCount) {
+          showMessage(messageEl, 'No successful downloads to clear');
+          return;
+        }
+        if (
+          !window.confirm(
+            'Remove ' +
+              successfulCount +
+              ' successful download' +
+              (successfulCount === 1 ? '' : 's') +
+              ' from history? Failed entries will be kept.',
+          )
+        ) {
+          return;
+        }
+        button.disabled = true;
+        api
+          .clearSuccessfulDownloadHistory()
+          .then(function (result) {
+            var removed = result && typeof result.removed === 'number' ? result.removed : successfulCount;
+            showMessage(messageEl, 'Cleared ' + removed + ' successful download' + (removed === 1 ? '' : 's'));
+            return refresh();
+          })
+          .catch(function (err) {
+            showMessage(messageEl, err.message, true);
+          })
+          .finally(function () {
+            button.disabled = false;
+          });
+      });
 
       refresh().catch(function (err) {
 

@@ -1,17 +1,41 @@
 using System.Security.Cryptography;
 using System.Text;
+using CherryBox.Plugins.Abstractions;
+using Microsoft.Data.Sqlite;
 
 namespace CherryBox.PasswordReset.Plugin;
+
+internal static class ResetTokenDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "reset-tokens",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS ResetTokens (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    TokenHash TEXT NOT NULL,
+                    UserId TEXT NOT NULL,
+                    ExpiresAt TEXT NOT NULL,
+                    UsedAt TEXT NULL,
+                    CreatedAt TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS IX_ResetTokens_TokenHash ON ResetTokens (TokenHash);
+                """)
+        ]);
+}
 
 internal sealed class ResetTokenStore
 {
     private readonly string _connectionString;
 
-    public ResetTokenStore(string dataDirectory)
+    public ResetTokenStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _connectionString = $"Data Source={Path.Combine(dataDirectory, "reset-tokens.db")}";
-        EnsureSchema();
+        var dbPath = context.GetDatabasePath("reset-tokens");
+        PluginDatabaseMigrator.Ensure(dbPath, ResetTokenDatabase.Schema);
+        _connectionString = $"Data Source={dbPath}";
     }
 
     public async Task StoreAsync(string tokenHash, Guid userId, DateTimeOffset expiresAt, CancellationToken cancellationToken)
@@ -74,26 +98,6 @@ internal sealed class ResetTokenStore
         command.CommandText = "DELETE FROM ResetTokens WHERE ExpiresAt < $now OR UsedAt IS NOT NULL;";
         command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.UtcDateTime.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    private void EnsureSchema()
-    {
-        using var connection = new Microsoft.Data.Sqlite.SqliteConnection(_connectionString);
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            CREATE TABLE IF NOT EXISTS ResetTokens (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                TokenHash TEXT NOT NULL,
-                UserId TEXT NOT NULL,
-                ExpiresAt TEXT NOT NULL,
-                UsedAt TEXT NULL,
-                CreatedAt TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS IX_ResetTokens_TokenHash ON ResetTokens (TokenHash);
-            """;
-        command.ExecuteNonQuery();
     }
 
     public static string HashToken(string token)

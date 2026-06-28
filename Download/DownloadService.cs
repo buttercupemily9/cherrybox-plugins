@@ -256,6 +256,9 @@ public sealed class DownloadService : IDownloadService
         return await _history.DeleteAsync(normalized, cancellationToken);
     }
 
+    public Task<int> ClearSuccessfulFromHistoryAsync(CancellationToken cancellationToken = default) =>
+        _history.ClearSuccessfulAsync(cancellationToken);
+
     public async Task<IReadOnlyList<AdminDownloadJobDto>> ListAllAsync(CancellationToken cancellationToken = default)
     {
         var jobs = (await _db.DownloadJobs

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace CherryBox.PasswordReset.Plugin;
 
-public sealed class PasswordResetPlugin : ICherryBoxPlugin, IPluginServiceContributor
+public sealed class PasswordResetPlugin : ICherryBoxPlugin, IPluginServiceContributor, IPluginSchemaContributor
 {
     public string Id => "password-reset";
     public string Name => "Password reset";
@@ -15,8 +15,8 @@ public sealed class PasswordResetPlugin : ICherryBoxPlugin, IPluginServiceContri
 
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
-        var settingsStore = new PasswordResetSettingsStore(context.DataDirectory);
-        var tokenStore = new ResetTokenStore(context.DataDirectory);
+        var settingsStore = new PasswordResetSettingsStore(context);
+        var tokenStore = new ResetTokenStore(context);
 
         registry.RegisterSingleton(settingsStore);
         registry.RegisterSingleton(tokenStore);
@@ -40,4 +40,6 @@ public sealed class PasswordResetPlugin : ICherryBoxPlugin, IPluginServiceContri
 
     public Task StopAsync(CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
+
+    public IReadOnlyList<PluginDatabaseSchema> GetDatabaseSchemas() => [ResetTokenDatabase.Schema];
 }

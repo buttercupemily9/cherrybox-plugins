@@ -11,7 +11,16 @@ public interface ICherryBoxPlugin
 public interface IPluginContext
 {
     IServiceProvider Services { get; }
+    /// <summary>Plugin install directory (binaries and web UI).</summary>
+    string InstallDirectory { get; }
+    /// <summary>Shared config folder: {ProgramData}/config/</summary>
+    string ConfigDirectory { get; }
+    /// <summary>Alias for <see cref="ConfigDirectory"/>.</summary>
     string DataDirectory { get; }
+    PluginStoragePaths Storage { get; }
+    string GetSettingsFilePath();
+    string GetConfigFilePath(string fileName);
+    string GetDatabasePath(string databaseName);
 }
 
 /// <summary>Optional: plugins implement this to register main nav or settings tabs at runtime.</summary>

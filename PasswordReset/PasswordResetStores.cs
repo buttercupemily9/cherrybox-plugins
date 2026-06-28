@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CherryBox.Plugins.Abstractions;
 
 namespace CherryBox.PasswordReset.Plugin;
 
@@ -15,10 +16,9 @@ internal sealed class PasswordResetSettingsStore
     private readonly object _lock = new();
     private PasswordResetSettings _current;
 
-    public PasswordResetSettingsStore(string dataDirectory)
+    public PasswordResetSettingsStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _path = Path.Combine(dataDirectory, "settings.json");
+        _path = context.GetConfigFilePath("settings.json");
         _current = Load();
     }
 

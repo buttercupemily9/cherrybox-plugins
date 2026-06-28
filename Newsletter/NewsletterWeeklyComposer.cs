@@ -115,9 +115,15 @@ public static partial class NewsletterWeeklyComposer
 
         var candidates = await query
             .OrderByDescending(m => m.ViewCount + m.PlayCount)
-            .ThenByDescending(m => m.UpdatedAt)
             .Take(RecommendationCandidatePool)
             .ToListAsync(cancellationToken);
+
+        // SQLite cannot translate DateTimeOffset in ORDER BY; refine ties in memory.
+        candidates = candidates
+            .OrderByDescending(m => m.ViewCount + m.PlayCount)
+            .ThenByDescending(m => m.UpdatedAt)
+            .Take(RecommendationCandidatePool)
+            .ToList();
 
         if (candidates.Count == 0)
             return [];

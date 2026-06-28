@@ -10,8 +10,7 @@ public sealed class HelloPlugin : ICherryBoxPlugin
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(context.DataDirectory);
-        File.WriteAllText(Path.Combine(context.DataDirectory, "hello.txt"), $"Hello from {Name} v{Version} at {DateTimeOffset.UtcNow:O}");
+        File.WriteAllText(context.GetConfigFilePath("hello.txt"), $"Hello from {Name} v{Version} at {DateTimeOffset.UtcNow:O}");
         return Task.CompletedTask;
     }
 }

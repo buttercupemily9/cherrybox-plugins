@@ -190,6 +190,7 @@ public interface IDownloadService
     Task<DownloadJobDto?> CancelAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
     Task<bool> DeleteFromQueueAsync(Guid id, Guid? forUserId = null, CancellationToken cancellationToken = default);
     Task<bool> DeleteFromHistoryAsync(string url, CancellationToken cancellationToken = default);
+    Task<int> ClearSuccessfulFromHistoryAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AdminDownloadJobDto>> ListAllAsync(CancellationToken cancellationToken = default);
     Task<DownloadSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task<DownloadSettingsDto> UpdateSettingsAsync(UpdateDownloadSettingsRequest request, CancellationToken cancellationToken = default);

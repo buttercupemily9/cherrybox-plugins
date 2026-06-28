@@ -1,16 +1,35 @@
+using CherryBox.Plugins.Abstractions;
 using Microsoft.Data.Sqlite;
 
 namespace CherryBox.Newsletter.Plugin;
+
+internal static class NewsletterSubscriptionDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "subscriptions",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS Subscriptions (
+                    UserId TEXT NOT NULL PRIMARY KEY,
+                    Subscribed INTEGER NOT NULL,
+                    UpdatedAt TEXT NOT NULL
+                );
+                """)
+        ]);
+}
 
 internal sealed class NewsletterSubscriptionStore
 {
     private readonly string _connectionString;
 
-    public NewsletterSubscriptionStore(string dataDirectory)
+    public NewsletterSubscriptionStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _connectionString = $"Data Source={Path.Combine(dataDirectory, "subscriptions.db")}";
-        EnsureSchema();
+        var dbPath = context.GetDatabasePath("subscriptions");
+        PluginDatabaseMigrator.Ensure(dbPath, NewsletterSubscriptionDatabase.Schema);
+        _connectionString = $"Data Source={dbPath}";
     }
 
     public async Task<bool> IsSubscribedAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -58,21 +77,5 @@ internal sealed class NewsletterSubscriptionStore
             results.Add(Guid.Parse(reader.GetString(0)));
 
         return results;
-    }
-
-    private void EnsureSchema()
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            CREATE TABLE IF NOT EXISTS Subscriptions (
-                UserId TEXT NOT NULL PRIMARY KEY,
-                Subscribed INTEGER NOT NULL,
-                UpdatedAt TEXT NOT NULL
-            );
-            """;
-        command.ExecuteNonQuery();
     }
 }

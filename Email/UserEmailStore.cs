@@ -1,38 +1,43 @@
 using CherryBox.Data;
+using CherryBox.Plugins.Abstractions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace CherryBox.Email.Plugin;
+
+internal static class UserEmailDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "user-emails",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS UserEmails (
+                    UserId TEXT NOT NULL PRIMARY KEY,
+                    Email TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS IX_UserEmails_Email ON UserEmails (Email);
+                """)
+        ]);
+}
 
 internal sealed class UserEmailStore
 {
     private readonly string _connectionString;
     private readonly string _dbPath;
 
-    public UserEmailStore(string dataDirectory)
+    public UserEmailStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _dbPath = Path.Combine(dataDirectory, "user-emails.db");
+        _dbPath = context.GetDatabasePath("user-emails");
+        PluginDatabaseMigrator.Ensure(_dbPath, UserEmailDatabase.Schema);
         _connectionString = $"Data Source={_dbPath}";
-        EnsureSchema();
     }
 
-    public void EnsureSchema()
-    {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            CREATE TABLE IF NOT EXISTS UserEmails (
-                UserId TEXT NOT NULL PRIMARY KEY,
-                Email TEXT NOT NULL,
-                UpdatedAt TEXT NOT NULL
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS IX_UserEmails_Email ON UserEmails (Email);
-            """;
-        command.ExecuteNonQuery();
-    }
+    public void EnsureSchema() =>
+        PluginDatabaseMigrator.Ensure(_dbPath, UserEmailDatabase.Schema);
 
     public bool HasAnyEmails()
     {

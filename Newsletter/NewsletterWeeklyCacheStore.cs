@@ -51,10 +51,9 @@ internal sealed class NewsletterWeeklyCacheStore
     private readonly string _cachePath;
     private readonly object _lock = new();
 
-    public NewsletterWeeklyCacheStore(string dataDirectory)
+    public NewsletterWeeklyCacheStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _cachePath = Path.Combine(dataDirectory, "weekly-digest-cache.json");
+        _cachePath = context.GetConfigFilePath("weekly-digest-cache.json");
     }
 
     public WeeklyDigestCache? Load() =>
@@ -73,9 +72,16 @@ internal sealed class NewsletterWeeklyCacheStore
     public bool IsReadyForWeek(string weekKey)
     {
         var cache = GetForWeek(weekKey);
-        return cache is not null
-            && HasVoice(cache, NewsletterNarratorVoice.Male)
-            && HasVoice(cache, NewsletterNarratorVoice.Female);
+        if (cache is null)
+            return false;
+
+        foreach (var (voice, audience, orientation) in NewsletterAiVariant.All())
+        {
+            if (!cache.Versions.ContainsKey(NewsletterAiVariant.CacheKey(voice, audience, orientation)))
+                return false;
+        }
+
+        return true;
     }
 
     public void Save(WeeklyDigestCache cache)
@@ -95,6 +101,4 @@ internal sealed class NewsletterWeeklyCacheStore
         }
     }
 
-    private static bool HasVoice(WeeklyDigestCache cache, NewsletterNarratorVoice voice) =>
-        cache.Versions.ContainsKey(voice.ToString());
 }

@@ -4,17 +4,47 @@ using Microsoft.Data.Sqlite;
 
 namespace CherryBox.Transcoder.Plugin;
 
+internal static class TranscodeJobDatabase
+{
+    public static readonly PluginDatabaseSchema Schema = new(
+        "transcode-jobs",
+        1,
+        [
+            new PluginSchemaMigrationStep(
+                1,
+                """
+                CREATE TABLE IF NOT EXISTS TranscodeJobs (
+                    Id TEXT PRIMARY KEY,
+                    MediaItemId TEXT NOT NULL,
+                    ProfileId TEXT NOT NULL,
+                    Status TEXT NOT NULL,
+                    MediaTitle TEXT NULL,
+                    SourcePath TEXT NOT NULL,
+                    OutputPath TEXT NULL,
+                    ErrorMessage TEXT NULL,
+                    BytesBefore INTEGER NULL,
+                    BytesAfter INTEGER NULL,
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL,
+                    StartedAt TEXT NULL,
+                    CompletedAt TEXT NULL
+                );
+                CREATE INDEX IF NOT EXISTS IX_TranscodeJobs_Status_CreatedAt ON TranscodeJobs(Status, CreatedAt);
+                CREATE INDEX IF NOT EXISTS IX_TranscodeJobs_MediaItemId ON TranscodeJobs(MediaItemId);
+                """)
+        ]);
+}
+
 internal sealed class TranscodeJobStore
 {
     private readonly string _connectionString;
     private readonly object _lock = new();
 
-    public TranscodeJobStore(string dataDirectory)
+    public TranscodeJobStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        var dbPath = Path.Combine(dataDirectory, "transcode-jobs.db");
+        var dbPath = context.GetDatabasePath("transcode-jobs");
+        PluginDatabaseMigrator.Ensure(dbPath, TranscodeJobDatabase.Schema);
         _connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ConnectionString;
-        EnsureSchema();
     }
 
     public TranscodeJobDto Add(Guid mediaItemId, Guid profileId, string? mediaTitle, string sourcePath)
@@ -251,32 +281,5 @@ internal sealed class TranscodeJobStore
         var conn = new SqliteConnection(_connectionString);
         conn.Open();
         return conn;
-    }
-
-    private void EnsureSchema()
-    {
-        using var conn = Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            CREATE TABLE IF NOT EXISTS TranscodeJobs (
-                Id TEXT PRIMARY KEY,
-                MediaItemId TEXT NOT NULL,
-                ProfileId TEXT NOT NULL,
-                Status TEXT NOT NULL,
-                MediaTitle TEXT NULL,
-                SourcePath TEXT NOT NULL,
-                OutputPath TEXT NULL,
-                ErrorMessage TEXT NULL,
-                BytesBefore INTEGER NULL,
-                BytesAfter INTEGER NULL,
-                CreatedAt TEXT NOT NULL,
-                UpdatedAt TEXT NOT NULL,
-                StartedAt TEXT NULL,
-                CompletedAt TEXT NULL
-            );
-            CREATE INDEX IF NOT EXISTS IX_TranscodeJobs_Status_CreatedAt ON TranscodeJobs(Status, CreatedAt);
-            CREATE INDEX IF NOT EXISTS IX_TranscodeJobs_MediaItemId ON TranscodeJobs(MediaItemId);
-            """;
-        cmd.ExecuteNonQuery();
     }
 }

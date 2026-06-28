@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CherryBox.Plugins.Abstractions;
 
 namespace CherryBox.Newsletter.Plugin;
 
@@ -19,10 +20,9 @@ internal sealed class NewsletterSettingsStore
     private readonly object _lock = new();
     private NewsletterSettings _current;
 
-    public NewsletterSettingsStore(string dataDirectory)
+    public NewsletterSettingsStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _path = Path.Combine(dataDirectory, "settings.json");
+        _path = context.GetConfigFilePath("settings.json");
         _current = Load();
     }
 

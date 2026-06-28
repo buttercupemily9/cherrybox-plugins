@@ -94,10 +94,10 @@ internal sealed class StoryCoverExecutor
             return Fail(job, ex.Message);
         }
 
-        AiImageResult image;
+        AiImageResult? generated;
         try
         {
-            var generated = await StoryCoverAiImageInvoker.TryGenerateAsync(
+            generated = await StoryCoverAiImageInvoker.TryGenerateAsync(
                 ai,
                 new AiImageRequest(
                     imagePrompt,
@@ -107,13 +107,13 @@ internal sealed class StoryCoverExecutor
                 cancellationToken);
             if (generated is null)
                 return Fail(job, "Story cover art requires AI plugin 1.2.0 or later with image generation support.");
-
-            image = generated;
         }
         catch (Exception ex)
         {
             return Fail(job, ex.Message);
         }
+
+        var image = generated;
 
         try
         {

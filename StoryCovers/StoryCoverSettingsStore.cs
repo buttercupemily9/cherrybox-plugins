@@ -26,10 +26,9 @@ internal sealed class StoryCoverSettingsStore
     private readonly object _lock = new();
     private StoryCoverSettings _settings;
 
-    public StoryCoverSettingsStore(string dataDirectory)
+    public StoryCoverSettingsStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _path = Path.Combine(dataDirectory, "settings.json");
+        _path = context.GetConfigFilePath("settings.json");
         _settings = Load();
     }
 

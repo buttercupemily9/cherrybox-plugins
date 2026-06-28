@@ -20,10 +20,9 @@ internal sealed class EmailSettingsStore
     private readonly object _lock = new();
     private EmailSettings _current;
 
-    public EmailSettingsStore(string dataDirectory)
+    public EmailSettingsStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _path = Path.Combine(dataDirectory, "settings.json");
+        _path = context.GetConfigFilePath("settings.json");
         _current = Load();
     }
 
@@ -119,10 +118,10 @@ internal static class LegacyEmailMigration
         }
     }
 
-    public static void TryImportUserEmailsDb(string pluginDirectory, UserEmailStore emailStore)
+    public static void TryImportUserEmailsDb(string pluginInstallDirectory, IPluginContext context, UserEmailStore emailStore)
     {
-        var legacyDb = Path.Combine(Path.GetDirectoryName(pluginDirectory)!, "password-reset", "user-emails.db");
-        var targetDb = Path.Combine(pluginDirectory, "user-emails.db");
+        var legacyDb = Path.Combine(Path.GetDirectoryName(pluginInstallDirectory)!, "password-reset", "user-emails.db");
+        var targetDb = context.GetDatabasePath("user-emails");
         if (!File.Exists(legacyDb) || File.Exists(targetDb))
             return;
 

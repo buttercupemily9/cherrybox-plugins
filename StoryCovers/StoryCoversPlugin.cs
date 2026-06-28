@@ -17,7 +17,7 @@ public sealed class StoryCoversPlugin : ICherryBoxPlugin, IPluginServiceContribu
 
     public string Id => "story-covers";
     public string Name => "Story covers";
-    public string Version => "1.0.0";
+    public string Version => "1.0.3";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -25,9 +25,8 @@ public sealed class StoryCoversPlugin : ICherryBoxPlugin, IPluginServiceContribu
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
         var services = context.Services;
-        var dataDirectory = context.DataDirectory;
-        var settingsStore = new StoryCoverSettingsStore(dataDirectory);
-        var jobStore = new StoryCoverJobStore(dataDirectory);
+        var settingsStore = new StoryCoverSettingsStore(context);
+        var jobStore = new StoryCoverJobStore(context);
         var workerState = new StoryCoverWorkerState();
         workerState.SetEnabled(settingsStore.Get().BackgroundWorkerEnabled);
 

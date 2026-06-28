@@ -1,0 +1,16 @@
+{
+  "id": "google-tag-images",
+  "name": "Google tag images",
+  "version": "1.0.0",
+  "entryAssembly": "GoogleTagImages.Plugin.dll",
+  "entryType": "CherryBox.GoogleTagImages.Plugin.GoogleTagImagesPlugin",
+  "settingsTabs": [
+    {
+      "id": "google-tag-images",
+      "label": "Google tag images",
+      "icon": "plugin",
+      "page": "settings.html",
+      "order": 86
+    }
+  ]
+}

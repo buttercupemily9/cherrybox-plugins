@@ -51,6 +51,8 @@ const api = {
   deleteDownload: (id) => apiRequest(`/downloads/${id}`, { method: 'DELETE' }),
   deleteDownloadHistory: (url) =>
     apiRequest('/downloads/history?url=' + encodeURIComponent(url), { method: 'DELETE' }),
+  clearSuccessfulDownloadHistory: () =>
+    apiRequest('/downloads/history/successful', { method: 'DELETE' }),
   getDownloadSettings: () => apiRequest('/settings/downloads'),
   updateDownloadSettings: (data) =>
     apiRequest('/settings/downloads', { method: 'PUT', body: JSON.stringify(data) }),

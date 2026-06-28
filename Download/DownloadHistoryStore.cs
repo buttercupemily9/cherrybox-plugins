@@ -26,6 +26,7 @@ public interface IDownloadHistoryStore
         CancellationToken cancellationToken = default);
     Task UpdateMediaItemAsync(string normalizedUrl, Guid mediaItemId, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string normalizedUrl, CancellationToken cancellationToken = default);
+    Task<int> ClearSuccessfulAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class DownloadHistoryStore : IDownloadHistoryStore
@@ -173,6 +174,16 @@ public sealed class DownloadHistoryStore : IDownloadHistoryStore
         command.Parameters.AddWithValue("$normalizedUrl", normalizedUrl);
         var rows = await command.ExecuteNonQueryAsync(cancellationToken);
         return rows > 0;
+    }
+
+    public async Task<int> ClearSuccessfulAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM DownloadHistory WHERE Failed = 0;";
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)

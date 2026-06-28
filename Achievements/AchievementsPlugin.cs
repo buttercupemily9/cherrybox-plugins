@@ -15,7 +15,7 @@ public sealed class AchievementsPlugin : ICherryBoxPlugin, IPluginServiceContrib
 
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
-        var store = new AchievementStore(context.DataDirectory);
+        var store = new AchievementStore(context);
         registry.RegisterSingleton(store);
         registry.RegisterScoped<IAchievementService>(sp => new AchievementService(
             sp.GetRequiredService<CherryBoxDbContext>(),

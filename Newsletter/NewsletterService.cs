@@ -128,7 +128,7 @@ internal sealed class NewsletterService : INewsletterService
         }
 
         var cache = _cacheStore.GetForWeek(weekKey);
-        if (cache is null || !HasBothVoiceVersions(cache))
+        if (cache is null || !HasAllAiVariants(cache))
         {
             _logger.LogWarning("Weekly digest cache is still unavailable for {WeekKey}; skipping send.", weekKey);
             return;
@@ -153,9 +153,8 @@ internal sealed class NewsletterService : INewsletterService
             try
             {
                 var voice = ResolveVoiceForUser(user, weekKey);
-                if (!cache.Versions.TryGetValue(voice.ToString(), out var version))
-                    version = cache.Versions[NewsletterNarratorVoice.Female.ToString()];
-                var aiIntro = version.AiIntro;
+                var audience = user.Gender ?? UserGender.Female;
+                NewsletterAiVariant.TryGetIntro(cache, voice, audience, user.SexualOrientation, out var aiIntro);
                 var (html, plain, _, narratorName) = NewsletterWeeklyComposer.RenderForUser(
                     user.Username,
                     user.SkinId,
@@ -215,23 +214,21 @@ internal sealed class NewsletterService : INewsletterService
             since,
             cancellationToken);
 
-        var maleIntro = await NewsletterWeeklyComposer.TryGenerateAiIntroAsync(
-            _plugins,
-            _services,
-            "[NAME]",
-            items,
-            NewsletterNarratorVoice.Male,
-            _logger,
-            cancellationToken);
-
-        var femaleIntro = await NewsletterWeeklyComposer.TryGenerateAiIntroAsync(
-            _plugins,
-            _services,
-            "[NAME]",
-            items,
-            NewsletterNarratorVoice.Female,
-            _logger,
-            cancellationToken);
+        var versions = new Dictionary<string, WeeklyDigestVoiceVersion>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (voice, audience, orientation) in NewsletterAiVariant.All())
+        {
+            var intro = await NewsletterWeeklyComposer.TryGenerateAiIntroAsync(
+                _plugins,
+                _services,
+                "[NAME]",
+                items,
+                voice,
+                audience,
+                orientation,
+                _logger,
+                cancellationToken);
+            versions[NewsletterAiVariant.CacheKey(voice, audience, orientation)] = new() { AiIntro = intro };
+        }
 
         var cache = new WeeklyDigestCache
         {
@@ -240,11 +237,7 @@ internal sealed class NewsletterService : INewsletterService
             GeneratedAt = utcNow,
             Items = items.ToList(),
             EmbeddedImages = embeddedImages.Select(CachedEmbeddedImage.From).ToList(),
-            Versions = new Dictionary<string, WeeklyDigestVoiceVersion>(StringComparer.OrdinalIgnoreCase)
-            {
-                [NewsletterNarratorVoice.Male.ToString()] = new() { AiIntro = maleIntro },
-                [NewsletterNarratorVoice.Female.ToString()] = new() { AiIntro = femaleIntro }
-            }
+            Versions = versions
         };
 
         _cacheStore.Save(cache);
@@ -254,7 +247,7 @@ internal sealed class NewsletterService : INewsletterService
         _settingsStore.Save(current);
 
         _logger.LogInformation(
-            "Weekly digest cache ready for {WeekKey} with {ItemCount} item(s) and male/female narrator intros.",
+            "Weekly digest cache ready for {WeekKey} with {ItemCount} item(s) and narrator/audience AI intros.",
             weekKey,
             items.Count);
     }
@@ -342,9 +335,16 @@ internal sealed class NewsletterService : INewsletterService
         return string.Equals(localNow.DayOfWeek.ToString(), NormalizeDay(settings.WeeklyDay), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool HasBothVoiceVersions(WeeklyDigestCache cache) =>
-        cache.Versions.ContainsKey(NewsletterNarratorVoice.Male.ToString())
-        && cache.Versions.ContainsKey(NewsletterNarratorVoice.Female.ToString());
+    private static bool HasAllAiVariants(WeeklyDigestCache cache)
+    {
+        foreach (var (voice, audience, orientation) in NewsletterAiVariant.All())
+        {
+            if (!cache.Versions.ContainsKey(NewsletterAiVariant.CacheKey(voice, audience, orientation)))
+                return false;
+        }
+
+        return true;
+    }
 
     private async Task<string?> ResolveEmailAsync(User user, CancellationToken cancellationToken)
     {

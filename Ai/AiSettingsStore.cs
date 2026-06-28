@@ -27,11 +27,16 @@ internal sealed class AiSettingsStore
     private readonly object _lock = new();
     private AiSettings _settings;
 
-    public AiSettingsStore(string dataDirectory)
+    public AiSettingsStore(IPluginContext context)
     {
-        Directory.CreateDirectory(dataDirectory);
-        _path = Path.Combine(dataDirectory, "settings.json");
+        _path = context.GetConfigFilePath("settings.json");
         _settings = Load();
+    }
+
+    public void ReloadFromDisk()
+    {
+        lock (_lock)
+            _settings = Load();
     }
 
     public AiSettings Get()
@@ -45,7 +50,7 @@ internal sealed class AiSettingsStore
         lock (_lock)
         {
             mutate(_settings);
-            File.WriteAllText(_path, JsonSerializer.Serialize(_settings, JsonOptions));
+            SaveToDisk(_settings);
             return Clone(_settings);
         }
     }
@@ -73,6 +78,14 @@ internal sealed class AiSettingsStore
         {
             return new AiSettings();
         }
+    }
+
+    private void SaveToDisk(AiSettings settings)
+    {
+        var json = JsonSerializer.Serialize(settings, JsonOptions);
+        var tempPath = _path + ".tmp";
+        File.WriteAllText(tempPath, json);
+        File.Move(tempPath, _path, overwrite: true);
     }
 
     private static AiSettings Clone(AiSettings settings) => new()
