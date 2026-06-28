@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Google tag images</title>
+  <link rel="stylesheet" href="cherrybox/stock-plugin.css" />
+  <link rel="stylesheet" href="plugin-ui.css" />
+</head>
+<body>
+  <div class="card">
+    <h1>Google tag images</h1>
+    <p class="meta">
+      Configure the
+      <a href="https://developers.google.com/custom-search/v1/using_rest" target="_blank" rel="noopener noreferrer">Google Custom Search JSON API</a>
+      to find images for tags without artwork. Create a Programmable Search Engine with image search enabled, then run
+      <strong>Add tag images (Google)</strong> from Settings → Tasks.
+    </p>
+    <div id="message" class="plugin-message" hidden></div>
+    <form id="settings-form">
+      <div class="settings-section">
+        <div class="form-row">
+          <label for="apiKey">Google API key</label>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="Leave blank to keep existing key" />
+          <p class="meta" id="apiKeyStatus"></p>
+        </div>
+        <div class="form-row inline">
+          <label><input type="checkbox" id="clearApiKey" /> Clear saved API key</label>
+        </div>
+        <div class="form-row">
+          <label for="searchEngineId">Search Engine ID (cx)</label>
+          <input id="searchEngineId" type="text" placeholder="017576662512468239146:omuauf_lfve" />
+          <p class="meta">From the Programmable Search Engine control panel. Enable image search for the engine.</p>
+        </div>
+        <div class="form-row">
+          <label for="searchQuerySuffix">Query suffix</label>
+          <input id="searchQuerySuffix" type="text" placeholder="Optional text appended to each tag name" />
+        </div>
+        <div class="form-row">
+          <label for="maxTagsPerRun">Max tags per run</label>
+          <input id="maxTagsPerRun" type="number" min="1" max="500" step="1" />
+          <p class="meta">The free tier allows about 100 queries per day.</p>
+        </div>
+        <div class="form-row">
+          <label for="requestDelayMs">Delay between tags (ms)</label>
+          <input id="requestDelayMs" type="number" min="0" max="10000" step="100" />
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save settings</button>
+        <button type="button" id="test-btn" class="btn-secondary">Test connection</button>
+      </div>
+    </form>
+  </div>
+  <script src="cherrybox/cherrybox-plugin-shell.js"></script>
+  <script src="cherrybox/cherrybox-plugin-api.js"></script>
+  <script src="plugin-api.js"></script>
+  <script src="settings-page.js"></script>
+</body>
+</html>

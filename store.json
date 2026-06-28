@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 29,
+  "catalogVersion": 30,
   "plugins": [
     {
       "id": "achievements",
@@ -60,6 +60,18 @@
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
       "changelog": "Per-send From display name override; inline cid: attachments with Content-Disposition inline."
+    },
+    {
+      "id": "google-tag-images",
+      "folder": "GoogleTagImages",
+      "name": "Google tag images",
+      "version": "1.0.0",
+      "description": "Search Google Custom Search for images and assign them to tags without artwork.",
+      "author": "CherryBox",
+      "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/GoogleTagImages",
+      "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
+      "screenshotUrls": [],
+      "changelog": "Initial release with settings UI and Add tag images (Google) admin task."
     },
     {
       "id": "image-download",

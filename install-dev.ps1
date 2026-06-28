@@ -34,14 +34,50 @@ function Get-PluginConfigDest {
     return Join-Path $PluginConfigRoot ($PluginId + '-' + $base + $ext)
 }
 
+function Get-SourceFilesWithoutReparse {
+    param([string]$RootDir)
+
+    if (-not (Test-Path -LiteralPath $RootDir)) { return @() }
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RootDir).Path
+    $files = New-Object System.Collections.Generic.List[object]
+    $pending = [System.Collections.Generic.Stack[string]]::new()
+    $visited = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $pending.Push($resolvedRoot)
+
+    while ($pending.Count -gt 0) {
+        $current = $pending.Pop()
+        if (-not $visited.Add($current)) { continue }
+
+        foreach ($entry in Get-ChildItem -LiteralPath $current -Force -ErrorAction SilentlyContinue) {
+            if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            if ($entry.PSIsContainer) {
+                if ($entry.Name -eq 'web') { continue }
+                $pending.Push($entry.FullName)
+            } else {
+                [void]$files.Add($entry)
+            }
+        }
+    }
+
+    return $files
+}
+
 function Copy-PluginStorageIfMissing {
     param(
         [string]$PluginId,
-        [string]$SourceDir
+        [string]$SourceDir,
+        [System.Collections.Generic.HashSet[string]]$VisitedSources = $null
     )
-    if (-not (Test-Path $SourceDir)) { return }
+    if ($null -eq $VisitedSources) {
+        $VisitedSources = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    }
+    if (-not (Test-Path -LiteralPath $SourceDir)) { return }
 
-    Get-ChildItem -Path $SourceDir -File | ForEach-Object {
+    $normalizedSource = (Resolve-Path -LiteralPath $SourceDir).Path
+    if (-not $VisitedSources.Add($normalizedSource)) { return }
+
+    Get-ChildItem -LiteralPath $SourceDir -File -ErrorAction SilentlyContinue | ForEach-Object {
         if ($_.Name -eq 'plugin.json' -or $_.Extension -in '.dll', '.pdb') { return }
         if ($_.Name -like '*.deps.json' -or $_.Name -like '*.runtimeconfig.json') { return }
 
@@ -56,31 +92,78 @@ function Copy-PluginStorageIfMissing {
             $dest = Get-PluginConfigDest -PluginId $PluginId -FileName $_.Name
         }
 
-        if (-not (Test-Path $dest)) {
+        if (-not (Test-Path -LiteralPath $dest)) {
             New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
             Copy-Item -Force $_.FullName $dest
         }
     }
 
-    Get-ChildItem -Path $SourceDir -Directory | Where-Object { $_.Name -ne 'web' } | ForEach-Object {
-        Get-ChildItem -Path $_.FullName -Recurse -File | ForEach-Object {
-            $dest = Get-PluginConfigDest -PluginId $PluginId -FileName $_.Name
-            if (-not (Test-Path $dest)) {
+    foreach ($subdir in Get-ChildItem -LiteralPath $SourceDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'web' }) {
+        foreach ($file in Get-SourceFilesWithoutReparse -RootDir $subdir.FullName) {
+            $dest = Get-PluginConfigDest -PluginId $PluginId -FileName $file.Name
+            if (-not (Test-Path -LiteralPath $dest)) {
                 New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
-                Copy-Item -Force $_.FullName $dest
+                Copy-Item -Force $file.FullName $dest
             }
         }
     }
 
     $legacyDataDir = Join-Path $MetadataRoot "plugin-data\$PluginId"
-    if (Test-Path $legacyDataDir) {
-        Copy-PluginStorageIfMissing -PluginId $PluginId -SourceDir $legacyDataDir
+    if (Test-Path -LiteralPath $legacyDataDir) {
+        Copy-PluginStorageIfMissing -PluginId $PluginId -SourceDir $legacyDataDir -VisitedSources $VisitedSources
     }
 
     $legacyConfigDir = Join-Path $PluginConfigRoot $PluginId
-    if (Test-Path $legacyConfigDir) {
-        Copy-PluginStorageIfMissing -PluginId $PluginId -SourceDir $legacyConfigDir
+    if (Test-Path -LiteralPath $legacyConfigDir) {
+        Copy-PluginStorageIfMissing -PluginId $PluginId -SourceDir $legacyConfigDir -VisitedSources $VisitedSources
     }
+}
+
+function Install-StagedPluginDirectory {
+    param(
+        [string]$StagingDir,
+        [string]$TargetDir
+    )
+
+    New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
+
+    Get-ChildItem -LiteralPath $StagingDir -Force | ForEach-Object {
+        $dest = Join-Path $TargetDir $_.Name
+        if ($_.PSIsContainer) {
+            Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force
+        } else {
+            try {
+                Copy-Item -LiteralPath $_.FullName -Destination $dest -Force -ErrorAction Stop
+            } catch {
+                Write-Warning "Could not update locked file (stop CherryBox to refresh plugins): $dest"
+            }
+        }
+    }
+
+    Get-ChildItem -LiteralPath $TargetDir -Recurse -File -Force | ForEach-Object {
+        $relative = $_.FullName.Substring($TargetDir.Length).TrimStart('\', '/')
+        $stagingPath = Join-Path $StagingDir $relative
+        if (Test-Path -LiteralPath $stagingPath) { return }
+        if ($_.Extension -eq '.db') { return }
+
+        try {
+            Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
+        } catch {
+            Write-Warning "Could not remove stale plugin file (may be in use): $($_.FullName)"
+        }
+    }
+
+    Get-ChildItem -LiteralPath $TargetDir -Recurse -Directory -Force |
+        Sort-Object { $_.FullName.Length } -Descending |
+        ForEach-Object {
+            if (-not (Get-ChildItem -LiteralPath $_.FullName -Force | Select-Object -First 1)) {
+                try {
+                    Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
+                } catch {
+                    Write-Warning "Could not remove empty plugin folder: $($_.FullName)"
+                }
+            }
+        }
 }
 
 $plugins = Get-ChildItem -Path $root -Directory | ForEach-Object {
@@ -115,14 +198,16 @@ foreach ($plugin in $plugins) {
 
     Get-ChildItem -Path $stagingDir -Filter "CherryBox.Plugins.Abstractions.*" | Remove-Item -Force
 
-    if (Test-Path $targetDir) {
+    if (Test-Path -LiteralPath $targetDir) {
         Copy-PluginStorageIfMissing -PluginId $plugin.Id -SourceDir $targetDir
-        Remove-Item -Recurse -Force $targetDir
+        Install-StagedPluginDirectory -StagingDir $stagingDir -TargetDir $targetDir
+    } else {
+        Copy-Item -Recurse -Force $stagingDir $targetDir
     }
-    Copy-Item -Recurse -Force $stagingDir $targetDir
     Remove-Item -Recurse -Force $stagingDir
 }
 
 Write-Host "Installed $($plugins.Count) plugin(s) to $ProgramDataRoot"
 Write-Host "Plugin config: $PluginConfigRoot\{plugin-id}-settings.json"
+Write-Host "If DLL updates failed, stop CherryBox and run this script again."
 Write-Host "Reload plugins from Settings -> Plugins, or restart CherryBox."

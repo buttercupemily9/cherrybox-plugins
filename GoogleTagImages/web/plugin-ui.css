@@ -1,0 +1,4 @@
+.settings-section { margin-top: 1.25rem; }
+.form-row { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem; }
+.form-row.inline { flex-direction: row; align-items: center; gap: 0.75rem; }
+.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
