@@ -9,37 +9,46 @@
 </head>
 <body>
   <div class="card">
-    <h1>Google tag images</h1>
+    <h1>Tag image search</h1>
     <p class="meta">
-      Configure the
-      <a href="https://developers.google.com/custom-search/v1/using_rest" target="_blank" rel="noopener noreferrer">Google Custom Search JSON API</a>
-      to find images for tags without artwork. Create a Programmable Search Engine with image search enabled, then run
+      Search for images and assign them to tags without artwork, then run
       <strong>Add tag images (Google)</strong> from Settings → Tasks.
     </p>
     <div id="message" class="plugin-message" hidden></div>
     <form id="settings-form">
       <div class="settings-section">
         <div class="form-row">
-          <label for="apiKey">Google API key</label>
+          <label for="searchProvider">Search provider</label>
+          <select id="searchProvider">
+            <option value="serper">Serper (Google Images, recommended)</option>
+            <option value="google-cse">Google Custom Search JSON API (legacy)</option>
+          </select>
+          <p class="meta" id="providerHelp">
+            Serper uses Google Image results via <a href="https://serper.dev" target="_blank" rel="noopener noreferrer">serper.dev</a>
+            (free tier available). Google Custom Search is closed to new Google Cloud accounts.
+          </p>
+        </div>
+        <div class="form-row">
+          <label for="apiKey">API key</label>
           <input id="apiKey" type="password" autocomplete="off" placeholder="Leave blank to keep existing key" />
           <p class="meta" id="apiKeyStatus"></p>
         </div>
         <div class="form-row inline">
           <label><input type="checkbox" id="clearApiKey" /> Clear saved API key</label>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="searchEngineRow">
           <label for="searchEngineId">Search Engine ID (cx)</label>
           <input id="searchEngineId" type="text" placeholder="017576662512468239146:omuauf_lfve" />
-          <p class="meta">From the Programmable Search Engine control panel. Enable image search for the engine.</p>
+          <p class="meta">Only for Google Custom Search. Enable image search on the engine.</p>
         </div>
         <div class="form-row">
           <label for="searchQuerySuffix">Query suffix</label>
-          <input id="searchQuerySuffix" type="text" placeholder="Optional text appended to each tag name" />
+          <input id="searchQuerySuffix" type="text" placeholder="Optional extra terms (e.g. hentai, bdsm)" />
+          <p class="meta">Each tag is searched with adult/porn terms first (porn, nsfw, xxx, nude, hardcore). Results from adult sites are ranked highest. Safe search is off.</p>
         </div>
         <div class="form-row">
           <label for="maxTagsPerRun">Max tags per run</label>
           <input id="maxTagsPerRun" type="number" min="1" max="500" step="1" />
-          <p class="meta">The free tier allows about 100 queries per day.</p>
         </div>
         <div class="form-row">
           <label for="requestDelayMs">Delay between tags (ms)</label>

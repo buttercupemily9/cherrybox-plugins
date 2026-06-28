@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 31,
+  "catalogVersion": 32,
   "plugins": [
     {
       "id": "achievements",
@@ -65,37 +65,37 @@
       "id": "google-tag-images",
       "folder": "GoogleTagImages",
       "name": "Google tag images",
-      "version": "1.0.0",
-      "description": "Search Google Custom Search for images and assign them to tags without artwork.",
+      "version": "1.2.3",
+      "description": "Search Google Images for tag artwork, preferring adult/NSFW and porn-themed results.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/GoogleTagImages",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with settings UI and Add tag images (Google) admin task."
+      "changelog": "Merge adult-biased search queries and rank image URLs from porn/adult domains ahead of stock or SFW results."
     },
     {
       "id": "image-download",
       "folder": "ImageDownload",
       "name": "Image downloader",
-      "version": "1.0.6",
+      "version": "1.0.7",
       "description": "Download images and galleries from supported sites into Pictures or Galleries libraries.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/ImageDownload",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Fix download cover routing and WebM GIF handling."
+      "changelog": "Update Motherless support from dead motherless.com to motherless.xxx with legacy URL normalization."
     },
     {
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.5.2",
+      "version": "1.5.3",
       "description": "Welcome emails on signup and weekly digests with new items plus hand-picked recommendations. Candy Cherry and Maxxx Cherry write intimate AI intros using performers, studios, and tags.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Orientation-aware weekly AI copy and narrator voice routing; gay women get sapphic Candy Cherry writing, with legacy digest cache key fallback."
+      "changelog": "Fix weekly digest cache on SQLite by sorting recommendation ties in memory instead of ORDER BY DateTimeOffset."
     },
     {
       "id": "password-reset",
@@ -137,13 +137,13 @@
       "id": "story-sites",
       "folder": "StorySites",
       "name": "Story site importers",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "description": "Import stories from Reddit, Literotica, LushStories, SexStories, SexStories69, and StoriesOnline.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StorySites",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
       "screenshotUrls": [],
-      "changelog": "Story import plugin for supported external sites."
+      "changelog": "Fix SexStories.com author extraction after title cleanup (read author link before removing title span)."
     },
     {
       "id": "story-tts",

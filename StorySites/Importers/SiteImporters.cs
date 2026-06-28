@@ -56,9 +56,35 @@ public sealed class SexStoriesImporter : HtmlStorySiteImporterBase
     protected override bool MatchesHost(Uri url) => HtmlStoryExtractor.HostMatches(url, "sexstories.com");
     protected override StoryImportPageResult ParsePage(HtmlDocument doc, Uri url)
     {
-        var title = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText.Trim() ?? "SexStories story";
-        var author = doc.DocumentNode.SelectSingleNode("//a[contains(@href,'/author/')]")?.InnerText.Trim();
-        var text = HtmlStoryExtractor.ExtractText(doc, "//div[@id='story']", "//div[contains(@class,'storytext')]", "//article");
+        var headerInfo = doc.DocumentNode.SelectSingleNode("//div[@id='top_panel']//div[contains(@class,'story_info')]")
+            ?? doc.DocumentNode.SelectSingleNode("//div[@id='story_center_panel']//div[contains(@class,'story_info')]");
+        var heading = headerInfo?.SelectSingleNode(".//h2");
+        string title;
+        string? author = null;
+
+        if (heading is not null)
+        {
+            author = heading.SelectSingleNode(".//span[contains(@class,'title_link')]//a[contains(@href,'/profile')]")
+                ?.InnerText.Trim();
+            heading.SelectSingleNode(".//span[contains(@class,'title_link')]")?.Remove();
+            title = HtmlEntity.DeEntitize(heading.InnerText).Trim();
+            if (string.IsNullOrWhiteSpace(title))
+                title = "SexStories story";
+        }
+        else
+        {
+            title = "SexStories story";
+            author = doc.DocumentNode
+                .SelectSingleNode("//div[@id='top_panel']//a[contains(@href,'/profile')]")
+                ?.InnerText.Trim();
+        }
+
+        var text = HtmlStoryExtractor.ExtractText(
+            doc,
+            "//div[@id='story_center_panel']//div[@class='block_panel']",
+            "//div[@id='story']",
+            "//div[contains(@class,'storytext')]",
+            "//article");
         var next = HtmlStoryExtractor.FindNextPage(doc, url);
         return new StoryImportPageResult(title, author, text, next);
     }

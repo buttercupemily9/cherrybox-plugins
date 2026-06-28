@@ -5,12 +5,17 @@ namespace CherryBox.GoogleTagImages.Plugin;
 internal sealed class GoogleTagImageService : IGoogleTagImageService
 {
     private readonly GoogleTagImageSettingsStore _settings;
-    private readonly GoogleCustomSearchClient _search;
+    private readonly GoogleCustomSearchClient _googleSearch;
+    private readonly SerperImageSearchClient _serperSearch;
 
-    public GoogleTagImageService(GoogleTagImageSettingsStore settings, GoogleCustomSearchClient search)
+    public GoogleTagImageService(
+        GoogleTagImageSettingsStore settings,
+        GoogleCustomSearchClient googleSearch,
+        SerperImageSearchClient serperSearch)
     {
         _settings = settings;
-        _search = search;
+        _googleSearch = googleSearch;
+        _serperSearch = serperSearch;
     }
 
     public Task<GoogleTagImageSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default)
@@ -28,9 +33,14 @@ internal sealed class GoogleTagImageService : IGoogleTagImageService
                 settings.ApiKey = request.ApiKey.Trim();
 
             if (request.SearchEngineId is not null)
+            {
                 settings.SearchEngineId = string.IsNullOrWhiteSpace(request.SearchEngineId)
                     ? null
                     : request.SearchEngineId.Trim();
+                settings.SearchProvider = string.IsNullOrWhiteSpace(settings.SearchEngineId)
+                    ? TagImageSearchProviders.Serper
+                    : TagImageSearchProviders.GoogleCustomSearch;
+            }
 
             if (request.SearchQuerySuffix is not null)
                 settings.SearchQuerySuffix = request.SearchQuerySuffix.Trim();
@@ -45,16 +55,16 @@ internal sealed class GoogleTagImageService : IGoogleTagImageService
     public async Task<GoogleTagImageTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         var settings = _settings.Get();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey) || string.IsNullOrWhiteSpace(settings.SearchEngineId))
-            return new GoogleTagImageTestResult(false, "Configure an API key and Search Engine ID first.");
+        if (!IsConfigured(settings))
+        {
+            return ResolveProvider(settings) == TagImageSearchProviders.GoogleCustomSearch
+                ? new GoogleTagImageTestResult(false, "Configure a Google API key and Search Engine ID first.")
+                : new GoogleTagImageTestResult(false, "Configure a Serper API key first.");
+        }
 
         try
         {
-            var urls = await _search.SearchImageUrlsAsync(
-                settings.ApiKey,
-                settings.SearchEngineId,
-                "test",
-                cancellationToken);
+            var urls = await SearchWithSettingsAsync(settings, "test", cancellationToken);
             return urls.Count > 0
                 ? new GoogleTagImageTestResult(true, $"Connection OK. Found {urls.Count} image result(s).")
                 : new GoogleTagImageTestResult(true, "Connection OK, but no image results were returned for the test query.");
@@ -70,30 +80,106 @@ internal sealed class GoogleTagImageService : IGoogleTagImageService
         CancellationToken cancellationToken = default)
     {
         var settings = _settings.Get();
-        if (string.IsNullOrWhiteSpace(settings.ApiKey) || string.IsNullOrWhiteSpace(settings.SearchEngineId))
+        if (!IsConfigured(settings))
             return Array.Empty<string>();
 
-        var searchQuery = string.IsNullOrWhiteSpace(settings.SearchQuerySuffix)
-            ? query
-            : $"{query} {settings.SearchQuerySuffix}".Trim();
+        var queries = TagImageSearchQueries.BuildQueries(query, settings.SearchQuerySuffix).ToList();
+        if (queries.Count == 0)
+            return Array.Empty<string>();
 
-        return await _search.SearchImageUrlsAsync(
-            settings.ApiKey,
-            settings.SearchEngineId,
-            searchQuery,
-            cancellationToken);
+        var candidates = new List<TagImageCandidate>();
+        var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var searchQuery in queries.Take(queries.Count - 1))
+        {
+            foreach (var candidate in await SearchCandidatesWithSettingsAsync(settings, searchQuery, cancellationToken))
+            {
+                if (seenUrls.Add(candidate.Url))
+                    candidates.Add(candidate);
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            foreach (var candidate in await SearchCandidatesWithSettingsAsync(settings, queries[^1], cancellationToken))
+            {
+                if (seenUrls.Add(candidate.Url))
+                    candidates.Add(candidate);
+            }
+        }
+
+        return TagImageUrlRanker.Rank(candidates);
+    }
+
+    private Task<IReadOnlyList<TagImageCandidate>> SearchCandidatesWithSettingsAsync(
+        GoogleTagImageSettings settings,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        if (ResolveProvider(settings) == TagImageSearchProviders.GoogleCustomSearch)
+        {
+            return _googleSearch.SearchCandidatesAsync(
+                settings.ApiKey!,
+                settings.SearchEngineId!,
+                query,
+                cancellationToken);
+        }
+
+        return _serperSearch.SearchCandidatesAsync(settings.ApiKey!, query, cancellationToken);
+    }
+
+    private Task<IReadOnlyList<string>> SearchWithSettingsAsync(
+        GoogleTagImageSettings settings,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        if (ResolveProvider(settings) == TagImageSearchProviders.GoogleCustomSearch)
+        {
+            return _googleSearch.SearchImageUrlsAsync(
+                settings.ApiKey!,
+                settings.SearchEngineId!,
+                query,
+                cancellationToken);
+        }
+
+        return _serperSearch.SearchImageUrlsAsync(settings.ApiKey!, query, cancellationToken);
+    }
+
+    private static bool IsConfigured(GoogleTagImageSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+            return false;
+
+        return ResolveProvider(settings) == TagImageSearchProviders.GoogleCustomSearch
+            ? !string.IsNullOrWhiteSpace(settings.SearchEngineId)
+            : true;
+    }
+
+    private static string ResolveProvider(GoogleTagImageSettings settings)
+    {
+        if (string.Equals(settings.SearchProvider, TagImageSearchProviders.GoogleCustomSearch, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(settings.SearchEngineId))
+            return TagImageSearchProviders.GoogleCustomSearch;
+
+        if (string.Equals(settings.SearchProvider, TagImageSearchProviders.Serper, StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(settings.SearchEngineId))
+            return TagImageSearchProviders.Serper;
+
+        return TagImageSearchProviders.GoogleCustomSearch;
     }
 
     private static GoogleTagImageSettingsDto ToDto(GoogleTagImageSettings settings)
     {
         var hasApiKey = !string.IsNullOrWhiteSpace(settings.ApiKey);
-        var hasSearchEngineId = !string.IsNullOrWhiteSpace(settings.SearchEngineId);
         return new GoogleTagImageSettingsDto(
             hasApiKey,
-            hasApiKey && hasSearchEngineId,
+            IsConfigured(settings),
             settings.SearchEngineId,
-            settings.SearchQuerySuffix,
+            settings.SearchQuerySuffix ?? string.Empty,
             Math.Clamp(settings.MaxTagsPerRun, 1, 500),
-            Math.Clamp(settings.RequestDelayMs, 0, 10_000));
+            Math.Clamp(settings.RequestDelayMs, 0, 10_000))
+        {
+            SearchProvider = ResolveProvider(settings),
+        };
     }
 }
