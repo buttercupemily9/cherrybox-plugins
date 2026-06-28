@@ -65,13 +65,13 @@
       "id": "google-tag-images",
       "folder": "GoogleTagImages",
       "name": "Google tag images",
-      "version": "1.2.0",
-      "description": "Search Google Images for tag artwork, preferring adult/NSFW results.",
+      "version": "1.2.3",
+      "description": "Search Google Images for tag artwork, preferring adult/NSFW and porn-themed results.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/GoogleTagImages",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Fix settings API mismatch with host abstractions; expose searchProvider in settings DTO."
+      "changelog": "Merge adult-biased search queries and rank image URLs from porn/adult domains ahead of stock or SFW results."
     },
     {
       "id": "image-download",

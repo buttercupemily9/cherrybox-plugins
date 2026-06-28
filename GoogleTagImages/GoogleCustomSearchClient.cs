@@ -8,7 +8,19 @@ internal sealed class GoogleCustomSearchClient
 
     public GoogleCustomSearchClient(HttpClient http) => _http = http;
 
-    public async Task<IReadOnlyList<string>> SearchImageUrlsAsync(
+    public Task<IReadOnlyList<string>> SearchImageUrlsAsync(
+        string apiKey,
+        string searchEngineId,
+        string query,
+        CancellationToken cancellationToken) =>
+        SearchCandidatesAsync(apiKey, searchEngineId, query, cancellationToken)
+            .ContinueWith(
+                task => (IReadOnlyList<string>)TagImageUrlRanker.Rank(task.Result),
+                cancellationToken,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+
+    public async Task<IReadOnlyList<TagImageCandidate>> SearchCandidatesAsync(
         string apiKey,
         string searchEngineId,
         string query,
@@ -30,24 +42,35 @@ internal sealed class GoogleCustomSearchClient
 
         using var document = JsonDocument.Parse(body);
         if (!document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
-            return Array.Empty<string>();
+            return Array.Empty<TagImageCandidate>();
 
-        var urls = new List<string>();
+        var candidates = new List<TagImageCandidate>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in items.EnumerateArray())
         {
-            if (urls.Count >= 10)
+            if (candidates.Count >= 10)
                 break;
 
-            TryAddUrl(urls, seen, item, "link");
+            var title = item.TryGetProperty("title", out var titleEl) ? titleEl.GetString() : null;
+            var pageLink = item.TryGetProperty("link", out var linkEl) ? linkEl.GetString() : null;
+            var displayLink = item.TryGetProperty("displayLink", out var displayEl) ? displayEl.GetString() : null;
+
+            TryAddCandidate(candidates, seen, item, "link", title, pageLink, displayLink);
             if (item.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.Object)
-                TryAddUrl(urls, seen, image, "thumbnailLink");
+                TryAddCandidate(candidates, seen, image, "thumbnailLink", title, pageLink, displayLink);
         }
 
-        return urls;
+        return candidates;
     }
 
-    private static void TryAddUrl(List<string> urls, HashSet<string> seen, JsonElement item, string propertyName)
+    private static void TryAddCandidate(
+        List<TagImageCandidate> candidates,
+        HashSet<string> seen,
+        JsonElement item,
+        string propertyName,
+        string? title,
+        string? sourcePage,
+        string? sourceSite)
     {
         if (!item.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.String)
             return;
@@ -60,7 +83,7 @@ internal sealed class GoogleCustomSearchClient
             && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             return;
 
-        urls.Add(url);
+        candidates.Add(new TagImageCandidate(url, title, sourcePage, sourceSite));
     }
 
     private static string ExtractApiError(string body, System.Net.HttpStatusCode statusCode)

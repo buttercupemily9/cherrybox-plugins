@@ -17,7 +17,8 @@
 
   async function load() {
     var settings = await api.getSettings();
-    providerSelect.value = settings.searchProvider === 'google-cse' ? 'google-cse' : 'serper';
+    var provider = settings.searchProvider || (settings.searchEngineId ? 'google-cse' : 'serper');
+    providerSelect.value = provider === 'google-cse' ? 'google-cse' : 'serper';
     updateProviderUi();
     document.getElementById('apiKeyStatus').textContent = settings.hasApiKey
       ? 'An API key is saved.'

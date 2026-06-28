@@ -9,14 +9,25 @@ internal sealed class SerperImageSearchClient
 
     public SerperImageSearchClient(HttpClient http) => _http = http;
 
-    public async Task<IReadOnlyList<string>> SearchImageUrlsAsync(
+    public Task<IReadOnlyList<string>> SearchImageUrlsAsync(
+        string apiKey,
+        string query,
+        CancellationToken cancellationToken) =>
+        SearchCandidatesAsync(apiKey, query, cancellationToken)
+            .ContinueWith(
+                task => (IReadOnlyList<string>)TagImageUrlRanker.Rank(task.Result),
+                cancellationToken,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+
+    public async Task<IReadOnlyList<TagImageCandidate>> SearchCandidatesAsync(
         string apiKey,
         string query,
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://google.serper.dev/images");
         request.Headers.TryAddWithoutValidation("X-API-KEY", apiKey);
-        request.Content = JsonContent.Create(new { q = query, num = 10, safe = "off" });
+        request.Content = JsonContent.Create(new { q = query, num = 20, safe = "off" });
 
         using var response = await _http.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -25,23 +36,34 @@ internal sealed class SerperImageSearchClient
 
         using var document = JsonDocument.Parse(body);
         if (!document.RootElement.TryGetProperty("images", out var images) || images.ValueKind != JsonValueKind.Array)
-            return Array.Empty<string>();
+            return Array.Empty<TagImageCandidate>();
 
-        var urls = new List<string>();
+        var candidates = new List<TagImageCandidate>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in images.EnumerateArray())
         {
-            if (urls.Count >= 10)
+            if (candidates.Count >= 20)
                 break;
 
-            TryAddUrl(urls, seen, item, "imageUrl");
-            TryAddUrl(urls, seen, item, "thumbnailUrl");
+            var title = item.TryGetProperty("title", out var titleEl) ? titleEl.GetString() : null;
+            var sourcePage = item.TryGetProperty("link", out var linkEl) ? linkEl.GetString() : null;
+            var sourceSite = item.TryGetProperty("source", out var sourceEl) ? sourceEl.GetString() : null;
+
+            TryAddCandidate(candidates, seen, item, "imageUrl", title, sourcePage, sourceSite);
+            TryAddCandidate(candidates, seen, item, "thumbnailUrl", title, sourcePage, sourceSite);
         }
 
-        return urls;
+        return candidates;
     }
 
-    private static void TryAddUrl(List<string> urls, HashSet<string> seen, JsonElement item, string propertyName)
+    private static void TryAddCandidate(
+        List<TagImageCandidate> candidates,
+        HashSet<string> seen,
+        JsonElement item,
+        string propertyName,
+        string? title,
+        string? sourcePage,
+        string? sourceSite)
     {
         if (!item.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.String)
             return;
@@ -54,7 +76,7 @@ internal sealed class SerperImageSearchClient
             && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             return;
 
-        urls.Add(url);
+        candidates.Add(new TagImageCandidate(url, title, sourcePage, sourceSite));
     }
 
     private static string ExtractApiError(string body, System.Net.HttpStatusCode statusCode)

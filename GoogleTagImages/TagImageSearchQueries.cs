@@ -8,9 +8,11 @@ internal static class TagImageSearchQueries
         if (string.IsNullOrWhiteSpace(tag))
             yield break;
 
-        yield return $"{tag} porn nsfw xxx";
-        yield return $"{tag} porn tag";
-        yield return $"{tag} x-rated adult";
+        yield return $"{tag} porn nsfw xxx nude";
+        yield return $"{tag} porn photo thumbnail";
+        yield return $"{tag} x-rated adult erotic";
+        yield return $"{tag} hardcore sex porn";
+        yield return $"{tag} nsfw tag image";
 
         if (!string.IsNullOrWhiteSpace(userSuffix))
             yield return $"{tag} {userSuffix.Trim()}";

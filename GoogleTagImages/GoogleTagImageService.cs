@@ -83,14 +83,49 @@ internal sealed class GoogleTagImageService : IGoogleTagImageService
         if (!IsConfigured(settings))
             return Array.Empty<string>();
 
-        foreach (var searchQuery in TagImageSearchQueries.BuildQueries(query, settings.SearchQuerySuffix))
+        var queries = TagImageSearchQueries.BuildQueries(query, settings.SearchQuerySuffix).ToList();
+        if (queries.Count == 0)
+            return Array.Empty<string>();
+
+        var candidates = new List<TagImageCandidate>();
+        var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var searchQuery in queries.Take(queries.Count - 1))
         {
-            var urls = await SearchWithSettingsAsync(settings, searchQuery, cancellationToken);
-            if (urls.Count > 0)
-                return urls;
+            foreach (var candidate in await SearchCandidatesWithSettingsAsync(settings, searchQuery, cancellationToken))
+            {
+                if (seenUrls.Add(candidate.Url))
+                    candidates.Add(candidate);
+            }
         }
 
-        return Array.Empty<string>();
+        if (candidates.Count == 0)
+        {
+            foreach (var candidate in await SearchCandidatesWithSettingsAsync(settings, queries[^1], cancellationToken))
+            {
+                if (seenUrls.Add(candidate.Url))
+                    candidates.Add(candidate);
+            }
+        }
+
+        return TagImageUrlRanker.Rank(candidates);
+    }
+
+    private Task<IReadOnlyList<TagImageCandidate>> SearchCandidatesWithSettingsAsync(
+        GoogleTagImageSettings settings,
+        string query,
+        CancellationToken cancellationToken)
+    {
+        if (ResolveProvider(settings) == TagImageSearchProviders.GoogleCustomSearch)
+        {
+            return _googleSearch.SearchCandidatesAsync(
+                settings.ApiKey!,
+                settings.SearchEngineId!,
+                query,
+                cancellationToken);
+        }
+
+        return _serperSearch.SearchCandidatesAsync(settings.ApiKey!, query, cancellationToken);
     }
 
     private Task<IReadOnlyList<string>> SearchWithSettingsAsync(
@@ -137,12 +172,14 @@ internal sealed class GoogleTagImageService : IGoogleTagImageService
     {
         var hasApiKey = !string.IsNullOrWhiteSpace(settings.ApiKey);
         return new GoogleTagImageSettingsDto(
-            ResolveProvider(settings),
             hasApiKey,
             IsConfigured(settings),
             settings.SearchEngineId,
-            settings.SearchQuerySuffix,
+            settings.SearchQuerySuffix ?? string.Empty,
             Math.Clamp(settings.MaxTagsPerRun, 1, 500),
-            Math.Clamp(settings.RequestDelayMs, 0, 10_000));
+            Math.Clamp(settings.RequestDelayMs, 0, 10_000))
+        {
+            SearchProvider = ResolveProvider(settings),
+        };
     }
 }
