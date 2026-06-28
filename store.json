@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 31,
+  "catalogVersion": 32,
   "plugins": [
     {
       "id": "achievements",
@@ -65,13 +65,13 @@
       "id": "google-tag-images",
       "folder": "GoogleTagImages",
       "name": "Google tag images",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Search Google Custom Search for images and assign them to tags without artwork.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/GoogleTagImages",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/Download/icon.png",
       "screenshotUrls": [],
-      "changelog": "Initial release with settings UI and Add tag images (Google) admin task."
+      "changelog": "Add Serper Google Images provider for new accounts; Google Custom Search JSON API is closed to new customers."
     },
     {
       "id": "image-download",

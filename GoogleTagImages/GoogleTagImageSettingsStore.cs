@@ -5,6 +5,7 @@ namespace CherryBox.GoogleTagImages.Plugin;
 
 internal sealed class GoogleTagImageSettings
 {
+    public string SearchProvider { get; set; } = TagImageSearchProviders.Serper;
     public string? ApiKey { get; set; }
     public string? SearchEngineId { get; set; }
     public string SearchQuerySuffix { get; set; } = string.Empty;
@@ -72,10 +73,22 @@ internal sealed class GoogleTagImageSettingsStore
 
     private static GoogleTagImageSettings Clone(GoogleTagImageSettings settings) => new()
     {
+        SearchProvider = NormalizeProvider(settings.SearchProvider, settings.SearchEngineId),
         ApiKey = settings.ApiKey,
         SearchEngineId = settings.SearchEngineId,
         SearchQuerySuffix = settings.SearchQuerySuffix,
         MaxTagsPerRun = settings.MaxTagsPerRun,
         RequestDelayMs = settings.RequestDelayMs
     };
+
+    private static string NormalizeProvider(string? provider, string? searchEngineId)
+    {
+        if (string.Equals(provider, TagImageSearchProviders.GoogleCustomSearch, StringComparison.OrdinalIgnoreCase))
+            return TagImageSearchProviders.GoogleCustomSearch;
+        if (string.Equals(provider, TagImageSearchProviders.Serper, StringComparison.OrdinalIgnoreCase))
+            return TagImageSearchProviders.Serper;
+        return string.IsNullOrWhiteSpace(searchEngineId)
+            ? TagImageSearchProviders.Serper
+            : TagImageSearchProviders.GoogleCustomSearch;
+    }
 }

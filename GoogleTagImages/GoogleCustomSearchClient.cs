@@ -72,7 +72,17 @@ internal sealed class GoogleCustomSearchClient
                 && error.TryGetProperty("message", out var message)
                 && message.ValueKind == JsonValueKind.String)
             {
-                return $"Google Custom Search HTTP {(int)statusCode}: {message.GetString()}";
+                var text = message.GetString() ?? string.Empty;
+                if (text.Contains("blocked", StringComparison.OrdinalIgnoreCase)
+                    || text.Contains("does not have the access", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Google Custom Search HTTP 403: API access is blocked for new Google Cloud projects. "
+                        + "Google closed the Custom Search JSON API to new customers. "
+                        + "Switch Search provider to Serper in plugin settings (free tier at serper.dev), "
+                        + "or use an existing Google CSE account created before the API closed.";
+                }
+
+                return $"Google Custom Search HTTP {(int)statusCode}: {text}";
             }
         }
         catch

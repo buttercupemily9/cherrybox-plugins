@@ -1,6 +1,8 @@
 (function () {
   var api = window.GoogleTagImagesApi;
   var messageEl = document.getElementById('message');
+  var providerSelect = document.getElementById('searchProvider');
+  var searchEngineRow = document.getElementById('searchEngineRow');
 
   function showMessage(text, kind) {
     messageEl.hidden = false;
@@ -8,10 +10,17 @@
     messageEl.className = 'plugin-message ' + (kind || '');
   }
 
+  function updateProviderUi() {
+    var isGoogle = providerSelect.value === 'google-cse';
+    searchEngineRow.hidden = !isGoogle;
+  }
+
   async function load() {
     var settings = await api.getSettings();
+    providerSelect.value = settings.searchEngineId ? 'google-cse' : 'serper';
+    updateProviderUi();
     document.getElementById('apiKeyStatus').textContent = settings.hasApiKey
-      ? 'A Google API key is saved.'
+      ? 'An API key is saved.'
       : 'No API key saved yet.';
     document.getElementById('searchEngineId').value = settings.searchEngineId || '';
     document.getElementById('searchQuerySuffix').value = settings.searchQuerySuffix || '';
@@ -19,12 +28,20 @@
     document.getElementById('requestDelayMs').value = settings.requestDelayMs || 500;
   }
 
+  providerSelect.onchange = function () {
+    if (providerSelect.value === 'serper') {
+      document.getElementById('searchEngineId').value = '';
+    }
+    updateProviderUi();
+  };
+
   document.getElementById('settings-form').onsubmit = async function (e) {
     e.preventDefault();
     try {
+      var isGoogle = providerSelect.value === 'google-cse';
       var payload = {
         clearApiKey: document.getElementById('clearApiKey').checked,
-        searchEngineId: document.getElementById('searchEngineId').value.trim(),
+        searchEngineId: isGoogle ? document.getElementById('searchEngineId').value.trim() : '',
         searchQuerySuffix: document.getElementById('searchQuerySuffix').value,
         maxTagsPerRun: Number(document.getElementById('maxTagsPerRun').value),
         requestDelayMs: Number(document.getElementById('requestDelayMs').value)

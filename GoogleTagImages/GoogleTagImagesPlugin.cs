@@ -7,7 +7,7 @@ public sealed class GoogleTagImagesPlugin : ICherryBoxPlugin, IPluginServiceCont
 {
     public string Id => "google-tag-images";
     public string Name => "Google tag images";
-    public string Version => "1.0.0";
+    public string Version => "1.1.0";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -15,11 +15,13 @@ public sealed class GoogleTagImagesPlugin : ICherryBoxPlugin, IPluginServiceCont
     public void RegisterServices(IPluginServiceRegistry registry, IPluginContext context)
     {
         var settingsStore = new GoogleTagImageSettingsStore(context);
-        var search = new GoogleCustomSearchClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
-        var service = new GoogleTagImageService(settingsStore, search);
+        var googleSearch = new GoogleCustomSearchClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        var serperSearch = new SerperImageSearchClient(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        var service = new GoogleTagImageService(settingsStore, googleSearch, serperSearch);
 
         registry.RegisterSingleton(settingsStore);
-        registry.RegisterSingleton(search);
+        registry.RegisterSingleton(googleSearch);
+        registry.RegisterSingleton(serperSearch);
         registry.RegisterSingleton(service);
         registry.RegisterScoped<IGoogleTagImageService>(sp =>
             sp.GetRequiredService<IPluginServiceRegistry>().Resolve<GoogleTagImageService>(sp)!);
