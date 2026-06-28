@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 30,
+  "catalogVersion": 31,
   "plugins": [
     {
       "id": "achievements",
@@ -89,13 +89,13 @@
       "id": "newsletter",
       "folder": "Newsletter",
       "name": "Newsletter",
-      "version": "1.5.0",
+      "version": "1.5.2",
       "description": "Welcome emails on signup and weekly digests with new items plus hand-picked recommendations. Candy Cherry and Maxxx Cherry write intimate AI intros using performers, studios, and tags.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/Newsletter",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/PasswordReset/icon.png",
       "screenshotUrls": [],
-      "changelog": "Intimate friend/lover weekly copy with performer callouts, metadata-rich AI prompts, and a recommendations section."
+      "changelog": "Orientation-aware weekly AI copy and narrator voice routing; gay women get sapphic Candy Cherry writing, with legacy digest cache key fallback."
     },
     {
       "id": "password-reset",
