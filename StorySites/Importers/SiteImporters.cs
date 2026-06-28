@@ -56,22 +56,27 @@ public sealed class SexStoriesImporter : HtmlStorySiteImporterBase
     protected override bool MatchesHost(Uri url) => HtmlStoryExtractor.HostMatches(url, "sexstories.com");
     protected override StoryImportPageResult ParsePage(HtmlDocument doc, Uri url)
     {
-        var heading = doc.DocumentNode.SelectSingleNode("//div[contains(@class,'story_info')]//h2");
+        var headerInfo = doc.DocumentNode.SelectSingleNode("//div[@id='top_panel']//div[contains(@class,'story_info')]")
+            ?? doc.DocumentNode.SelectSingleNode("//div[@id='story_center_panel']//div[contains(@class,'story_info')]");
+        var heading = headerInfo?.SelectSingleNode(".//h2");
         string title;
-        string? author;
+        string? author = null;
 
         if (heading is not null)
         {
+            author = heading.SelectSingleNode(".//span[contains(@class,'title_link')]//a[contains(@href,'/profile')]")
+                ?.InnerText.Trim();
             heading.SelectSingleNode(".//span[contains(@class,'title_link')]")?.Remove();
             title = HtmlEntity.DeEntitize(heading.InnerText).Trim();
-            author = doc.DocumentNode
-                .SelectSingleNode("//div[contains(@class,'story_info')]//a[contains(@href,'/profile')]")
-                ?.InnerText.Trim();
+            if (string.IsNullOrWhiteSpace(title))
+                title = "SexStories story";
         }
         else
         {
             title = "SexStories story";
-            author = doc.DocumentNode.SelectSingleNode("//a[contains(@href,'/profile')]")?.InnerText.Trim();
+            author = doc.DocumentNode
+                .SelectSingleNode("//div[@id='top_panel']//a[contains(@href,'/profile')]")
+                ?.InnerText.Trim();
         }
 
         var text = HtmlStoryExtractor.ExtractText(

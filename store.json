@@ -137,13 +137,13 @@
       "id": "story-sites",
       "folder": "StorySites",
       "name": "Story site importers",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "Import stories from Reddit, Literotica, LushStories, SexStories, SexStories69, and StoriesOnline.",
       "author": "CherryBox",
       "homepage": "https://github.com/buttercupemily9/cherrybox-plugins/tree/main/StorySites",
       "iconUrl": "https://raw.githubusercontent.com/buttercupemily9/cherrybox-plugins/main/StorySites/icon.png",
       "screenshotUrls": [],
-      "changelog": "Fix SexStories.com title and author parsing (profile links, story h2)."
+      "changelog": "Fix SexStories.com author extraction after title cleanup (read author link before removing title span)."
     },
     {
       "id": "story-tts",
