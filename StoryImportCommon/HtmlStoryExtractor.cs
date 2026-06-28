@@ -28,6 +28,38 @@ public static partial class HtmlStoryExtractor
         return HtmlEntity.DeEntitize(doc.DocumentNode.SelectSingleNode("//body")?.InnerText ?? string.Empty).Trim();
     }
 
+    public static string ExtractTextFromFirst(HtmlDocument doc, params string[] selectors)
+    {
+        foreach (var selector in selectors)
+        {
+            var node = doc.DocumentNode.SelectSingleNode(selector);
+            if (node is null)
+                continue;
+
+            var text = HtmlEntity.DeEntitize(node.InnerText).Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+                return text;
+        }
+
+        return ExtractText(doc, selectors);
+    }
+
+    public static string ExtractTextFromFirstOrEmpty(HtmlDocument doc, params string[] selectors)
+    {
+        foreach (var selector in selectors)
+        {
+            var node = doc.DocumentNode.SelectSingleNode(selector);
+            if (node is null)
+                continue;
+
+            var text = HtmlEntity.DeEntitize(node.InnerText).Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+                return text;
+        }
+
+        return string.Empty;
+    }
+
     public static string? ExtractMeta(HtmlDocument doc, string name)
     {
         var node = doc.DocumentNode.SelectSingleNode($"//meta[@name='{name}']")

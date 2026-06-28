@@ -17,7 +17,7 @@ public sealed class StoryCoversPlugin : ICherryBoxPlugin, IPluginServiceContribu
 
     public string Id => "story-covers";
     public string Name => "Story covers";
-    public string Version => "1.0.3";
+    public string Version => "1.0.5";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;

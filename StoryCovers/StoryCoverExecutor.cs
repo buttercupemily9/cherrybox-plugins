@@ -56,11 +56,14 @@ internal sealed class StoryCoverExecutor
         if (story is null)
             return Fail(job, "Story media item was not found.");
 
-        if (pluginSettings.SkipWhenCoverExists
-            && await blobs.ExistsAsync(story.Id, MediaBlobKind.PrimaryImage, cancellationToken))
+        if (pluginSettings.SkipWhenCoverExists)
         {
-            await SyncCoverToLinkedAudioAsync(db, blobs, story.Id, cancellationToken);
-            return Complete(job, "Cover already exists; synced to linked audio if needed.");
+            var existing = await blobs.GetAsync(story.Id, MediaBlobKind.PrimaryImage, cancellationToken);
+            if (existing is not null && StoryCoverImageValidator.IsAcceptableCover(existing.Data, existing.MimeType))
+            {
+                await SyncCoverToLinkedAudioAsync(db, blobs, story.Id, cancellationToken);
+                return Complete(job, "Cover already exists; synced to linked audio if needed.");
+            }
         }
 
         string plainText;
@@ -78,10 +81,10 @@ internal sealed class StoryCoverExecutor
             Math.Clamp(pluginSettings.ContextCharLimit, 500, 8000));
 
         var title = string.IsNullOrWhiteSpace(story.Title) ? story.FileName : story.Title!;
-        string imagePrompt;
+        string primaryPrompt;
         try
         {
-            imagePrompt = await StoryCoverPromptBuilder.BuildImagePromptAsync(
+            primaryPrompt = await StoryCoverPromptBuilder.BuildImagePromptAsync(
                 ai,
                 title,
                 story.Author,
@@ -94,30 +97,64 @@ internal sealed class StoryCoverExecutor
             return Fail(job, ex.Message);
         }
 
-        AiImageResult? generated;
-        try
+        var authorLine = string.IsNullOrWhiteSpace(story.Author) ? "Unknown Author" : story.Author.Trim();
+        var backgroundContext = StoryCoverPromptBuilder.ExtractBackgroundContext(excerpt);
+
+        var imageRequest = new AiImageRequest(
+            primaryPrompt,
+            Width: Math.Clamp(pluginSettings.ImageWidth, 256, 2048),
+            Height: Math.Clamp(pluginSettings.ImageHeight, 256, 2048),
+            Format: "webp");
+
+        var promptAttempts = new[]
         {
-            generated = await StoryCoverAiImageInvoker.TryGenerateAsync(
-                ai,
-                new AiImageRequest(
-                    imagePrompt,
-                    Width: Math.Clamp(pluginSettings.ImageWidth, 256, 2048),
-                    Height: Math.Clamp(pluginSettings.ImageHeight, 256, 2048),
-                    Format: "webp"),
-                cancellationToken);
-            if (generated is null)
-                return Fail(job, "Story cover art requires AI plugin 1.2.0 or later with image generation support.");
-        }
-        catch (Exception ex)
+            primaryPrompt,
+            StoryCoverPromptBuilder.BuildAbstractPrompt(title, authorLine, backgroundContext),
+            StoryCoverPromptBuilder.BuildGenericPrompt(title, authorLine, backgroundContext),
+        };
+
+        AiImageResult? generated = null;
+        string? lastError = null;
+        foreach (var prompt in promptAttempts.Distinct(StringComparer.Ordinal))
         {
-            return Fail(job, ex.Message);
+            try
+            {
+                var attempt = await StoryCoverAiImageInvoker.TryGenerateAsync(
+                    ai,
+                    imageRequest with { Prompt = prompt },
+                    cancellationToken);
+                if (attempt is null)
+                {
+                    lastError = "Story cover art requires AI plugin 1.2.0 or later with image generation support.";
+                    break;
+                }
+
+                if (!StoryCoverImageValidator.IsAcceptableCover(attempt.Data, attempt.MimeType))
+                {
+                    lastError = "Venice returned a moderation placeholder instead of cover art.";
+                    _logger.LogWarning(
+                        "Rejected generated cover for {StoryId}; prompt was moderated or invalid ({Bytes} bytes)",
+                        story.Id,
+                        attempt.Data.Length);
+                    continue;
+                }
+
+                generated = attempt;
+                break;
+            }
+            catch (Exception ex)
+            {
+                lastError = ex.Message;
+                _logger.LogWarning(ex, "Story cover generation attempt failed for {StoryId}", story.Id);
+            }
         }
 
-        var image = generated;
+        if (generated is null)
+            return Fail(job, lastError ?? "Story cover generation failed.");
 
         try
         {
-            await blobs.UpsertAsync(story.Id, MediaBlobKind.PrimaryImage, image.MimeType, image.Data, cancellationToken);
+            await blobs.UpsertAsync(story.Id, MediaBlobKind.PrimaryImage, generated.MimeType, generated.Data, cancellationToken);
             await SyncCoverToLinkedAudioAsync(db, blobs, story.Id, cancellationToken);
         }
         catch (Exception ex)

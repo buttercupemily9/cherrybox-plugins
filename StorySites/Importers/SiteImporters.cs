@@ -68,7 +68,7 @@ public sealed class SexStoriesImporter : HtmlStorySiteImporterBase
                 ?.InnerText.Trim();
             heading.SelectSingleNode(".//span[contains(@class,'title_link')]")?.Remove();
             title = HtmlEntity.DeEntitize(heading.InnerText).Trim();
-            if (string.IsNullOrWhiteSpace(title))
+            if (string.IsNullOrWhiteSpace(title) || IsSiteChromeTitle(title))
                 title = "SexStories story";
         }
         else
@@ -79,15 +79,40 @@ public sealed class SexStoriesImporter : HtmlStorySiteImporterBase
                 ?.InnerText.Trim();
         }
 
-        var text = HtmlStoryExtractor.ExtractText(
-            doc,
-            "//div[@id='story_center_panel']//div[@class='block_panel']",
-            "//div[@id='story']",
-            "//div[contains(@class,'storytext')]",
-            "//article");
+        if (IsSiteChromeTitle(title))
+        {
+            var fallbackHeading = headerInfo?.SelectSingleNode(".//h2")
+                ?? doc.DocumentNode.SelectSingleNode("//div[contains(@class,'story_info')]//h2");
+            if (fallbackHeading is not null)
+            {
+                author ??= fallbackHeading.SelectSingleNode(".//span[contains(@class,'title_link')]//a[contains(@href,'/profile')]")
+                    ?.InnerText.Trim();
+                fallbackHeading.SelectSingleNode(".//span[contains(@class,'title_link')]")?.Remove();
+                title = HtmlEntity.DeEntitize(fallbackHeading.InnerText).Trim();
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(title) || IsSiteChromeTitle(title))
+            title = "SexStories story";
+
+        var text = SexStoriesContentExtractor.ExtractStoryText(doc);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            text = HtmlStoryExtractor.ExtractTextFromFirstOrEmpty(
+                doc,
+                "//div[@id='story_center_panel']/div[contains(@class,'block_panel')][last()-1]",
+                "//div[@id='story_center_panel']//div[contains(@class,'block_panel')][not(.//*[@id='comments'])][last()]");
+        }
+
         var next = HtmlStoryExtractor.FindNextPage(doc, url);
         return new StoryImportPageResult(title, author, text, next);
     }
+
+    private static bool IsSiteChromeTitle(string title) =>
+        title.Equals("sexstories.com", StringComparison.OrdinalIgnoreCase)
+        || title.Equals("SexStories.com", StringComparison.OrdinalIgnoreCase)
+        || title.Equals("XNXX Stories", StringComparison.OrdinalIgnoreCase)
+        || title.Equals("Free Sex Stories & Erotic Stories @ XNXX.COM", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class SexStories69Importer : HtmlStorySiteImporterBase

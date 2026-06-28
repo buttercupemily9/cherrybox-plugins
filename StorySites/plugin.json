@@ -1,7 +1,7 @@
 {
   "id": "story-sites",
   "name": "Story site importers",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "entryAssembly": "StorySites.Plugin.dll",
   "entryType": "StorySites.Plugin.StorySitesPlugin"
 }

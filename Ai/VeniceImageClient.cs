@@ -36,33 +36,102 @@ internal sealed class VeniceImageClient
         });
 
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var text = body.Length == 0 ? string.Empty : System.Text.Encoding.UTF8.GetString(body);
             throw new InvalidOperationException(
-                string.IsNullOrWhiteSpace(body)
+                string.IsNullOrWhiteSpace(text)
                     ? $"Venice image generation failed ({(int)response.StatusCode})."
-                    : $"Venice image generation failed ({(int)response.StatusCode}): {body}");
+                    : $"Venice image generation failed ({(int)response.StatusCode}): {text}");
         }
+
+        if (TryReadJsonError(body, out var jsonError))
+            throw new InvalidOperationException(jsonError);
 
         var contentType = response.Content.Headers.ContentType?.MediaType;
         if (!string.IsNullOrWhiteSpace(contentType) && contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
-            var binary = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-            if (binary.Length == 0)
+            if (body.Length == 0)
                 throw new InvalidOperationException("Venice image generation returned an empty image.");
 
-            return (binary, contentType);
+            return (body, contentType);
         }
 
-        var payload = await response.Content.ReadFromJsonAsync<VeniceImageResponse>(cancellationToken);
-        var base64 = payload?.Images?.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(base64))
-            throw new InvalidOperationException("Venice image generation returned no image data.");
+        if (body.Length > 0 && body[0] == '{')
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("images", out var images) &&
+                images.ValueKind == System.Text.Json.JsonValueKind.Array &&
+                images.GetArrayLength() > 0)
+            {
+                var base64 = images[0].GetString();
+                if (!string.IsNullOrWhiteSpace(base64))
+                {
+                    var data = Convert.FromBase64String(base64);
+                    return (data, GuessMimeType(format));
+                }
+            }
 
-        var data = Convert.FromBase64String(base64);
-        var mimeType = GuessMimeType(format);
-        return (data, mimeType);
+            if (TryReadJsonError(body, out jsonError))
+                throw new InvalidOperationException(jsonError);
+        }
+
+        throw new InvalidOperationException("Venice image generation returned no image data.");
+    }
+
+    private static bool TryReadJsonError(byte[] body, out string message)
+    {
+        message = string.Empty;
+        if (body.Length == 0 || body[0] != '{')
+            return false;
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("error", out var error))
+            {
+                message = error.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? error.GetString() ?? "Venice image generation failed."
+                    : error.ToString();
+                return true;
+            }
+
+            if (root.TryGetProperty("message", out var messageProp) &&
+                messageProp.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var text = messageProp.GetString();
+                if (!string.IsNullOrWhiteSpace(text) &&
+                    text.Contains("terms", StringComparison.OrdinalIgnoreCase))
+                {
+                    message = text;
+                    return true;
+                }
+            }
+
+            if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var item in errors.EnumerateArray())
+                {
+                    if (item.TryGetProperty("message", out var itemMessage) &&
+                        itemMessage.ValueKind == System.Text.Json.JsonValueKind.String &&
+                        !string.IsNullOrWhiteSpace(itemMessage.GetString()))
+                    {
+                        message = itemMessage.GetString()!;
+                        return true;
+                    }
+                }
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+
+        return false;
     }
 
     private static string GuessMimeType(string format) =>
@@ -92,11 +161,5 @@ internal sealed class VeniceImageClient
 
         [JsonPropertyName("return_binary")]
         public bool ReturnBinary { get; set; }
-    }
-
-    private sealed class VeniceImageResponse
-    {
-        [JsonPropertyName("images")]
-        public List<string>? Images { get; set; }
     }
 }

@@ -9,7 +9,7 @@ public sealed class AiPlugin : ICherryBoxPlugin, IPluginServiceContributor
 
     public string Id => "ai";
     public string Name => "AI";
-    public string Version => "1.2.2";
+    public string Version => "1.2.3";
 
     public Task InitializeAsync(IPluginContext context, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
